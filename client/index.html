@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Racing Online</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a1a;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            border: 10px solid #333;
+            border-radius: 10px;
+            overflow: hidden;
+            width: 1200px;
+            height: 800px;
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            background: #1a5e1a;
+        }
+        #audio-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        .audio-btn {
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            border: 2px solid #fff;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+        }
+        .audio-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        #speedometer {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 3px solid #fff;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            width: 100px;
+            z-index: 100;
+        }
+        #speed-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #55ff55;
+        }
+        #speed-unit {
+            font-size: 0.8rem;
+            color: #ccc;
+        }
+        #ui {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            text-align: center;
+            border: 4px solid #fff;
+        }
+        input {
+            padding: 10px;
+            margin: 10px;
+            font-family: inherit;
+            font-size: 1.2rem;
+        }
+        button {
+            padding: 10px 20px;
+            background: #55ff55;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        button:hover {
+            background: #22cc22;
+        }
+        .car-selection {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .car-option {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #555;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .car-option.selected {
+            border-color: #55ff55;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="1200" height="800"></canvas>
+        <div id="audio-controls">
+            <button id="toggleMusic" class="audio-btn">Music: ON</button>
+            <button id="toggleEngine" class="audio-btn">Engine: ON</button>
+        </div>
+        <div id="speedometer">
+            <div id="speed-value">0</div>
+            <div id="speed-unit">KM/H</div>
+        </div>
+        <div id="ui">
+            <h1>PIXEL RACING</h1>
+            <input type="text" id="nickname" placeholder="Enter Nickname" maxlength="12">
+            <div class="car-selection" id="carSelection">
+                <div class="car-option selected" data-color="#ff0000" style="background: #ff0000;"></div>
+                <div class="car-option" data-color="#00ff00" style="background: #00ff00;"></div>
+                <div class="car-option" data-color="#0000ff" style="background: #0000ff;"></div>
+                <div class="car-option" data-color="#ffff00" style="background: #ffff00;"></div>
+                <div class="car-option" data-color="#ff00ff" style="background: #ff00ff;"></div>
+            </div>
+            <button id="startBtn">START RACE</button>
+        </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
+
