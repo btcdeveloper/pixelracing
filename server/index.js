@@ -14,6 +14,7 @@ app.use(express.static(path.join(__dirname, '../client')));
 const players = {};
 let gameState = 'LOBBY';
 let winners = [];
+let targetLaps = 5; 
 
 io.on('connection', (socket) => {
     players[socket.id] = {
@@ -29,13 +30,19 @@ io.on('connection', (socket) => {
 
     socket.emit('currentPlayers', players);
     socket.emit('gameStateUpdate', gameState);
+    socket.emit('updateTargetLaps', targetLaps);
 
     socket.on('joinGame', (data) => {
         if (players[socket.id]) {
+            if (data.laps) {
+                targetLaps = parseInt(data.laps);
+                io.emit('updateTargetLaps', targetLaps);
+            }
+
             const colorToUse = data.color || players[socket.id].color;
-            const isColorTaken = Object.values(players).some(p => p.ready && p.color === colorToUse && p.id !== socket.id);
+            const isTakenByOther = Object.values(players).some(p => p.ready && p.id !== socket.id && p.color === colorToUse);
             
-            if (isColorTaken) {
+            if (isTakenByOther) {
                 players[socket.id].color = '#' + Math.floor(Math.random()*16777215).toString(16);
             } else {
                 players[socket.id].color = colorToUse;
@@ -71,7 +78,7 @@ io.on('connection', (socket) => {
             players[socket.id].laps++;
             io.emit('playerUpdated', players[socket.id]);
 
-            if (players[socket.id].laps >= 3) {
+            if (players[socket.id].laps >= targetLaps) {
                 players[socket.id].finished = true;
                 winners.push({
                     nickname: players[socket.id].nickname,
@@ -102,6 +109,7 @@ io.on('connection', (socket) => {
             });
             io.emit('gameStateUpdate', gameState);
             io.emit('currentPlayers', players);
+            io.emit('updateTargetLaps', targetLaps);
         }
     });
 

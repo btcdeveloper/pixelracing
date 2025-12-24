@@ -54,24 +54,48 @@
         }
         #speedometer {
             position: absolute;
-            bottom: 20px;
-            right: 20px;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.7);
             border: 3px solid #fff;
             padding: 10px;
             border-radius: 10px;
             text-align: center;
-            width: 100px;
+            width: 120px;
             z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         #speed-value {
             font-size: 2rem;
             font-weight: bold;
             color: #55ff55;
+            line-height: 1;
         }
         #speed-unit {
             font-size: 0.8rem;
             color: #ccc;
+            margin-top: 5px;
+        }
+        .lap-selection {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .lap-selection label {
+            font-size: 1rem;
+        }
+        select#lapCount {
+            padding: 5px;
+            background: #333;
+            color: #fff;
+            border: 2px solid #fff;
+            font-family: inherit;
+            cursor: pointer;
         }
         #ui {
             position: absolute;
@@ -141,6 +165,14 @@
                 <div class="car-option" data-color="#0000ff" style="background: #0000ff;"></div>
                 <div class="car-option" data-color="#ffff00" style="background: #ffff00;"></div>
                 <div class="car-option" data-color="#ff00ff" style="background: #ff00ff;"></div>
+            </div>
+            <div class="lap-selection">
+                <label for="lapCount">LAPS TO WIN:</label>
+                <select id="lapCount">
+                    <option value="5">5 Laps</option>
+                    <option value="10">10 Laps</option>
+                    <option value="15">15 Laps</option>
+                </select>
             </div>
             <button id="startBtn">START RACE</button>
         </div>

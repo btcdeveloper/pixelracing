@@ -7,6 +7,7 @@ const carOptions = document.querySelectorAll('.car-option');
 const toggleMusicBtn = document.getElementById('toggleMusic');
 const toggleEngineBtn = document.getElementById('toggleEngine');
 const speedValueEl = document.getElementById('speed-value');
+const lapCountSelect = document.getElementById('lapCount');
 
 // --- РЕТРО ЗВУКОВАЯ СИСТЕМА (Web Audio API) ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -112,6 +113,7 @@ let gameState = 'LOBBY';
 let gameStarted = false;
 let winnersList = [];
 let fireworks = [];
+let targetLaps = 5;
 
 const ACCEL = 0.18;
 const FRICTION = 0.96;
@@ -157,10 +159,11 @@ function joinGame() {
     audioCtx.resume();
     initAudio();
     const nick = nicknameInput.value.trim() || 'Guest' + Math.floor(Math.random() * 1000);
+    const laps = lapCountSelect.value;
     localPlayer.nickname = nick;
     ui.style.display = 'none';
     gameStarted = true;
-    socket.emit('joinGame', { nickname: nick, color: localPlayer.color });
+    socket.emit('joinGame', { nickname: nick, color: localPlayer.color, laps: laps });
 }
 
 socket.on('connect', () => { 
@@ -203,6 +206,11 @@ socket.on('playerUpdated', (playerInfo) => {
     }
     const takenColors = Object.values(players).filter(p => p.ready).map(p => p.color);
     updateColorUI(takenColors);
+});
+
+socket.on('updateTargetLaps', (laps) => {
+    targetLaps = laps;
+    if (lapCountSelect) lapCountSelect.value = laps;
 });
 
 socket.on('gameStateUpdate', (state, winners) => {
@@ -280,7 +288,6 @@ function update() {
 
     if (gameState === 'FINISHED') {
         updateEngineSound(0);
-        // Обновляем салюты
         if (Math.random() < 0.1) {
             fireworks.push({
                 x: Math.random() * canvas.width,
@@ -414,7 +421,7 @@ function drawCar(player) {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 14px Courier New';
     ctx.textAlign = 'center';
-    ctx.fillText(`${player.nickname} [${player.laps || 0}/3]`, player.x, player.y - 25);
+    ctx.fillText(`${player.nickname} [${player.laps || 0}/${targetLaps}]`, player.x, player.y - 25);
 }
 
 function drawPodium() {
