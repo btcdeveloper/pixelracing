@@ -8,7 +8,12 @@ const socket = io();
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    console.log("Canvas resized to:", canvas.width, "x", canvas.height);
+    // Сбрасываем камеру на игрока, чтобы избежать "улета" в пустоту
+    if (localPlayer) {
+        cameraX = localPlayer.x;
+        cameraY = localPlayer.y;
+    }
+    console.log("Canvas stabilized after resize");
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas(); 
@@ -715,124 +720,99 @@ function updateColorUI() {
 }
 
 function update() {
-    if (!gameStarted) return;
-    
-    if (gameState === 'LOBBY') {
-        const moveUp = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц || keys.Enter || keys[' '];
+    try {
+        if (!gameStarted || !trackPoints || trackPoints.length < 2) return;
         
-        // Прямая проверка из актуального списка игроков
-        const me = players[socket.id];
-        if (moveUp && me && me.isHost) {
-            socket.emit('startGame');
+        if (gameState === 'LOBBY') {
+            const moveUp = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц || keys.Enter || keys[' '];
+            
+            // Используем прямой флаг из localPlayer для надежности
+            if (moveUp && localPlayer.isHost) {
+                socket.emit('startGame');
+            }
+            updateEngineSound(0); return;
         }
-        updateEngineSound(0); return;
-    }
-    if (gameState === 'FINISHED') { updateEngineSound(0); updateFireworks(); return; }
+        if (gameState === 'FINISHED') { updateEngineSound(0); updateFireworks(); return; }
 
-    let currentMaxSpeed = MAX_SPEED;
-    const isOffRoad = checkOffRoad(localPlayer.x, localPlayer.y);
-    if (isOffRoad) currentMaxSpeed = OFF_ROAD_SPEED;
+        let currentMaxSpeed = MAX_SPEED;
+        const isOffRoad = checkOffRoad(localPlayer.x, localPlayer.y);
+        if (isOffRoad) currentMaxSpeed = OFF_ROAD_SPEED;
 
-    // 1. УСКОРЕНИЕ И ТОРМОЖЕНИЕ
-    const moveUp = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц;
-    const moveDown = keys.s || keys.S || keys.ArrowDown || keys.ы || keys.Ы;
-    
-    if (moveUp) localPlayer.speed += ACCEL;
-    else if (moveDown) localPlayer.speed -= ACCEL;
-    localPlayer.speed *= FRICTION;
+        // 1. УСКОРЕНИЕ И ТОРМОЖЕНИЕ
+        const moveUp = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц;
+        const moveDown = keys.s || keys.S || keys.ArrowDown || keys.ы || keys.Ы;
+        
+        if (moveUp) localPlayer.speed += ACCEL;
+        else if (moveDown) localPlayer.speed -= ACCEL;
+        localPlayer.speed *= FRICTION;
 
-    // ... (остальное без изменений)
+        // Расчет общей скорости (Нитро + Слипстрим)
+        nitroBoost *= 0.96; 
+        if (trackHazards && trackHazards.nitro) {
+            trackHazards.nitro.forEach(n => {
+                const d = Math.sqrt(Math.pow(localPlayer.x - n.x, 2) + Math.pow(localPlayer.y - n.y, 2));
+                if (d < 250) nitroBoost = 20.0;
+            });
+        }
 
-    // 4. РУЛЕВОЕ УПРАВЛЕНИЕ
-    const leftPressed = keys.a || keys.A || keys.ArrowLeft || keys.ф || keys.Ф;
-    const rightPressed = keys.d || keys.D || keys.ArrowRight || keys.в || keys.В;
-    const steerTarget = leftPressed ? -1 : (rightPressed ? 1 : 0);
-    localPlayer.steering = (localPlayer.steering || 0) + (steerTarget - (localPlayer.steering || 0)) * 0.4;
+        const totalSpeed = localPlayer.speed + nitroBoost;
+        
+        // 4. РУЛЕВОЕ УПРАВЛЕНИЕ
+        const leftPressed = keys.a || keys.A || keys.ArrowLeft || keys.ф || keys.Ф;
+        const rightPressed = keys.d || keys.D || keys.ArrowRight || keys.в || keys.В;
+        const steerTarget = leftPressed ? -1 : (rightPressed ? 1 : 0);
+        localPlayer.steering = (localPlayer.steering || 0) + (steerTarget - (localPlayer.steering || 0)) * 0.4;
 
-    if (Math.abs(totalSpeed) > 0.1) {
-        const turnDir = totalSpeed > 0 ? 1 : -1;
-        const speedFactor = Math.max(0.7, 1.0 - (Math.abs(totalSpeed) / (MAX_SPEED + 15)) * 0.3);
-        localPlayer.angle += (localPlayer.steering * TURN_SPEED * turnDir * speedFactor);
-    }
+        if (Math.abs(totalSpeed) > 0.1) {
+            const turnDir = totalSpeed > 0 ? 1 : -1;
+            const speedFactor = Math.max(0.7, 1.0 - (Math.abs(totalSpeed) / (MAX_SPEED + 15)) * 0.3);
+            localPlayer.angle += (localPlayer.steering * TURN_SPEED * turnDir * speedFactor);
+        }
 
-    if (localPlayer.speed > currentMaxSpeed) localPlayer.speed = currentMaxSpeed;
-    if (localPlayer.speed < -currentMaxSpeed/2) localPlayer.speed = -currentMaxSpeed/2;
+        if (localPlayer.speed > currentMaxSpeed) localPlayer.speed = currentMaxSpeed;
+        if (localPlayer.speed < -currentMaxSpeed/2) localPlayer.speed = -currentMaxSpeed/2;
 
-    localPlayer.x += Math.cos(localPlayer.angle) * totalSpeed;
-    localPlayer.y += Math.sin(localPlayer.angle) * totalSpeed;
-    
-    // 5. ЧАСТИЦЫ (Дым/Пыль)
-    if (Math.abs(totalSpeed) > 5) {
-        const pColor = isOffRoad ? '#8b4513' : '#ddd'; // Коричневый на траве, серый на асфальте
-        if (Math.random() < 0.3) {
+        localPlayer.x += Math.cos(localPlayer.angle) * totalSpeed;
+        localPlayer.y += Math.sin(localPlayer.angle) * totalSpeed;
+        
+        // Обновление частиц и звуков
+        if (Math.abs(totalSpeed) > 5 && Math.random() < 0.3) {
             wheelParticles.push({
                 x: localPlayer.x - Math.cos(localPlayer.angle) * 40,
                 y: localPlayer.y - Math.sin(localPlayer.angle) * 40,
                 vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
-                life: 1.0, color: pColor, size: 5 + Math.random() * 10
+                life: 1.0, color: isOffRoad ? '#8b4513' : '#ddd', size: 5 + Math.random() * 10
             });
         }
-    }
-    wheelParticles.forEach((p, idx) => {
-        p.x += p.vx; p.y += p.vy; p.life -= 0.03; p.size += 0.5;
-        if (p.life <= 0) wheelParticles.splice(idx, 1);
-    });
+        wheelParticles.forEach((p, idx) => {
+            p.x += p.vx; p.y += p.vy; p.life -= 0.03; p.size += 0.5;
+            if (p.life <= 0) wheelParticles.splice(idx, 1);
+        });
 
-    // 6. ОБНОВЛЕНИЕ ЭМОДЗИ
-    activeEmojis.forEach((e, idx) => {
-        e.life -= 0.01; e.yOffset -= 1;
-        if (e.life <= 0) activeEmojis.splice(idx, 1);
-    });
-
-    updateEngineSound(totalSpeed);
-    
-    // Проверка близости к трибунам для звука
-    tribunes.forEach(t => {
-        const d = Math.sqrt(Math.pow(localPlayer.x - t.x, 2) + Math.pow(localPlayer.y - t.y, 2));
-        if (d < 600) playCheer();
-    });
-    
-    if (speedValueEl) {
-        const displaySpeed = Math.floor(Math.abs(totalSpeed) * 10.0);
-        speedValueEl.textContent = displaySpeed;
-        speedValueEl.style.color = displaySpeed > 250 ? '#f55' : (displaySpeed > 150 ? '#ff5' : '#5f5');
-    }
-
-    if (lapValueEl) {
-        lapValueEl.textContent = `LAP ${localPlayer.laps}/${targetLaps}`;
-    }
-
-    // Чекпоинт
-    const midPointIdx = Math.floor(trackPoints.length / 2);
-    const checkpoint = trackPoints[midPointIdx];
-    const distToCheckpoint = Math.sqrt(Math.pow(localPlayer.x - checkpoint.x, 2) + Math.pow(localPlayer.y - checkpoint.y, 2));
-    if (distToCheckpoint < 1500) localPlayer.checkpointHit = true;
-
-    // Таймер круга
-    if (gameState === 'RACING') {
-        localPlayer.currentLapTime += 1000/60; // Примерно 16.6ms на кадр (60fps)
-        if (currentLapEl) currentLapEl.textContent = `LAP: ${formatTime(localPlayer.currentLapTime)}`;
-    }
-
-    const fx = trackPoints[0].x;
-    const fy = trackPoints[0].y;
-    const onFinishLine = Math.abs(localPlayer.x - fx) < 100 && Math.abs(localPlayer.y - fy) < roadWidth/2;
-    if (onFinishLine && !localPlayer.lastPassedFinish && totalSpeed > 0 && localPlayer.checkpointHit) {
-        // Обработка времени круга
-        if (localPlayer.bestLapTime === null || localPlayer.bestLapTime === Infinity || localPlayer.currentLapTime < localPlayer.bestLapTime) {
-            localPlayer.bestLapTime = localPlayer.currentLapTime;
-            if (bestLapEl) bestLapEl.textContent = `BEST: ${formatTime(localPlayer.bestLapTime)}`;
-        }
-        localPlayer.currentLapTime = 0;
+        updateEngineSound(totalSpeed);
         
-        socket.emit('lapCompleted', { bestLapTime: localPlayer.bestLapTime });
-        localPlayer.lastPassedFinish = true; localPlayer.checkpointHit = false;
-    } else if (!onFinishLine) {
-        localPlayer.lastPassedFinish = false;
-    }
+        if (speedValueEl) {
+            const displaySpeed = Math.floor(Math.abs(totalSpeed) * 10.0);
+            speedValueEl.textContent = displaySpeed;
+        }
 
-    if (gameState === 'RACING') {
-        socket.emit('playerMovement', { x: localPlayer.x, y: localPlayer.y, angle: localPlayer.angle });
+        // Чекпоинт и Линия финиша
+        const fx = trackPoints[0].x;
+        const fy = trackPoints[0].y;
+        const onFinishLine = Math.abs(localPlayer.x - fx) < 150 && Math.abs(localPlayer.y - fy) < roadWidth/2;
+        
+        if (onFinishLine && !localPlayer.lastPassedFinish && totalSpeed > 0) {
+            socket.emit('lapCompleted', { bestLapTime: localPlayer.bestLapTime });
+            localPlayer.lastPassedFinish = true;
+        } else if (!onFinishLine) {
+            localPlayer.lastPassedFinish = false;
+        }
+
+        if (gameState === 'RACING') {
+            socket.emit('playerMovement', { x: localPlayer.x, y: localPlayer.y, angle: localPlayer.angle });
+        }
+    } catch (e) {
+        console.error("Critical update crash prevented:", e);
     }
 }
 
@@ -1136,7 +1116,15 @@ function render() {
             drawLeaderboard();
         }
 
-        requestAnimationFrame(() => { update(); render(); });
+        requestAnimationFrame(() => { 
+            try {
+                update(); 
+                render(); 
+            } catch (loopErr) {
+                console.error("Main loop crash prevented:", loopErr);
+                requestAnimationFrame(render); // Пытаемся продолжить отрисовку
+            }
+        });
     } catch (err) {
         console.error("Render error:", err);
         requestAnimationFrame(render);
