@@ -5,6 +5,92 @@ console.log("Pixel Racing Engine v1.2 Initializing...");
 
 const socket = io();
 
+// --- ПРЕСЕТЫ ТРАСС ---
+const trackPresets = {
+    preset1: { 
+        points: [{x: 3000, y: 1000}, {x: 7000, y: 1000}, {x: 8500, y: 2500}, {x: 10000, y: 1000}, {x: 12000, y: 3000}, {x: 10500, y: 4500}, {x: 13000, y: 6000}, {x: 11000, y: 8000}, {x: 8000, y: 6500}, {x: 7000, y: 9000}, {x: 5000, y: 7000}, {x: 3000, y: 9500}, {x: 1500, y: 7500}, {x: 2500, y: 5000}, {x: 800, y: 4500}, {x: 800, y: 1000}, {x: 3000, y: 1000}]
+    },
+    preset2: { 
+        points: [{x: 3000, y: 1000}, {x: 10000, y: 1000}, {x: 13000, y: 2000}, {x: 14000, y: 5000}, {x: 12000, y: 8500}, {x: 9000, y: 9500}, {x: 6000, y: 8000}, {x: 4000, y: 9500}, {x: 1000, y: 8500}, {x: 500, y: 5000}, {x: 800, y: 1000}, {x: 3000, y: 1000}]
+    },
+    preset3: { 
+        points: [{x: 3000, y: 1000}, {x: 9000, y: 1000}, {x: 9000, y: 2500}, {x: 2000, y: 2500}, {x: 2000, y: 4000}, {x: 11000, y: 4000}, {x: 11000, y: 5500}, {x: 1500, y: 5500}, {x: 1500, y: 7000}, {x: 12000, y: 7000}, {x: 12000, y: 8500}, {x: 1000, y: 8500}, {x: 1000, y: 1000}, {x: 3000, y: 1000}]
+    },
+    preset4: { 
+        points: [{x: 3000, y: 1000}, {x: 6000, y: 1000}, {x: 4000, y: 2500}, {x: 8000, y: 2500}, {x: 6000, y: 4500}, {x: 10000, y: 4500}, {x: 8000, y: 6500}, {x: 12000, y: 6500}, {x: 1000, y: 8000}, {x: 1000, y: 1000}, {x: 3000, y: 1000}]
+    },
+    preset5: { 
+        points: [{x: 3000, y: 1000}, {x: 10000, y: 1000}, {x: 12000, y: 5000}, {x: 10000, y: 9000}, {x: 4000, y: 9000}, {x: 2000, y: 5000}, {x: 4000, y: 2500}, {x: 8000, y: 2500}, {x: 9000, y: 5000}, {x: 8000, y: 7500}, {x: 4000, y: 7500}, {x: 800, y: 1000}, {x: 3000, y: 1000}]
+    }
+};
+
+// --- БАЗОВЫЕ ПЕРЕМЕННЫЕ СОСТОЯНИЯ ---
+let myId = null, players = {}, gameState = 'LOBBY', gameStarted = false, winnersList = [], fireworks = [], targetLaps = 5;
+let trackPoints = trackPresets.preset1.points, trackHazards = null, trackData = trackPresets.preset1, trees = [], tribunes = [];
+const roadWidth = 400;
+
+let zoomLevel = 1.0;
+let targetZoom = 1.0; 
+const minZoom = 0.02; 
+const maxZoom = 4.0;  
+
+let cameraX = 3000;
+let cameraY = 1000;
+let isDragging = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
+let cameraOffsetX = 0;
+let cameraOffsetY = 0;
+
+let localPlayer = {
+    id: null, x: 2800, y: 1000, angle: 0, speed: 0,
+    nickname: '', color: '#ff0000', laps: 0,
+    lastPassedFinish: false, ready: false, checkpointHit: false,
+    steering: 0, currentLapTime: 0, bestLapTime: Infinity,
+    isHost: false, roomId: null
+};
+
+// --- СОБЫТИЯ МЫШИ ДЛЯ ЗУМА И ТАСКАНИЯ ---
+window.addEventListener('mousedown', (e) => {
+    if (e.target === canvas) {
+        isDragging = true;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+    }
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+        const dx = (e.clientX - lastMouseX) / zoomLevel;
+        const dy = (e.clientY - lastMouseY) / zoomLevel;
+        cameraOffsetX -= dx;
+        cameraOffsetY -= dy;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+    }
+});
+
+window.addEventListener('mouseup', () => {
+    isDragging = false;
+});
+
+window.addEventListener('wheel', (e) => {
+    const zoomFactor = 1.15;
+    if (e.deltaY > 0) targetZoom /= zoomFactor;
+    else targetZoom *= zoomFactor;
+    targetZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
+}, { passive: true });
+
+document.getElementById('zoomIn').addEventListener('click', (e) => {
+    e.preventDefault();
+    targetZoom = Math.min(maxZoom, targetZoom * 1.4);
+});
+
+document.getElementById('zoomOut').addEventListener('click', (e) => {
+    e.preventDefault();
+    targetZoom = Math.max(minZoom, targetZoom / 1.4);
+});
+
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -277,62 +363,6 @@ function updateEngineSound(speed) {
 
 // --- МИР И КАМЕРА ---
 let zoomLevel = 1.0;
-let targetZoom = 1.0; // Целевой зум для плавности
-const minZoom = 0.02; // Еще больше отдаления для масштаба
-const maxZoom = 4.0;  // Еще больше приближения для деталей
-
-// Плавная камера
-let cameraX = 3000;
-let cameraY = 1000;
-let isDragging = false;
-let lastMouseX = 0;
-let lastMouseY = 0;
-let cameraOffsetX = 0;
-let cameraOffsetY = 0;
-
-window.addEventListener('mousedown', (e) => {
-    if (e.target === canvas) {
-        isDragging = true;
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-    }
-});
-
-window.addEventListener('mousemove', (e) => {
-    if (isDragging) {
-        const dx = (e.clientX - lastMouseX) / zoomLevel;
-        const dy = (e.clientY - lastMouseY) / zoomLevel;
-        cameraOffsetX -= dx;
-        cameraOffsetY -= dy;
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-    }
-});
-
-window.addEventListener('mouseup', () => {
-    isDragging = false;
-});
-
-window.addEventListener('wheel', (e) => {
-    // Плавный экспоненциальный зум (изменяем на % от текущего)
-    const zoomFactor = 1.15;
-    if (e.deltaY > 0) targetZoom /= zoomFactor;
-    else targetZoom *= zoomFactor;
-    targetZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
-}, { passive: true });
-
-document.getElementById('zoomIn').addEventListener('click', (e) => {
-    e.preventDefault();
-    targetZoom = Math.min(maxZoom, targetZoom * 1.4);
-});
-
-document.getElementById('zoomOut').addEventListener('click', (e) => {
-    e.preventDefault();
-    targetZoom = Math.max(minZoom, targetZoom / 1.4);
-});
-
-let myId = null, players = {}, gameState = 'LOBBY', gameStarted = false, winnersList = [], fireworks = [], targetLaps = 5;
-
 // ЭФФЕКТЫ И ГЕЙМПЛЕЙ
 let wheelParticles = [];
 let activeEmojis = [];
@@ -341,14 +371,6 @@ let nitroBoost = 0; // Дополнительная скорость от нит
 
 // МАТЕМАТИЧЕСКИ ТОЧНАЯ ФИЗИКА
 const ACCEL = 0.055, FRICTION = 0.9975, TURN_SPEED = 0.05, MAX_SPEED = 22.0, OFF_ROAD_SPEED = 5.0;
-
-let localPlayer = {
-    id: null, x: 2800, y: 1000, angle: 0, speed: 0,
-    nickname: '', color: '#ff0000', laps: 0,
-    lastPassedFinish: false, ready: false, checkpointHit: false,
-    steering: 0, currentLapTime: 0, bestLapTime: Infinity,
-    isHost: false, roomId: null
-};
 
 function formatTime(ms) {
     if (ms === null || ms === undefined || ms === Infinity) return "--:--.--";
@@ -359,28 +381,8 @@ function formatTime(ms) {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${hundredths.toString().padStart(2, '0')}`;
 }
 
-const trackPresets = {
-    preset1: { 
-        points: [{x: 3000, y: 1000}, {x: 7000, y: 1000}, {x: 8500, y: 2500}, {x: 10000, y: 1000}, {x: 12000, y: 3000}, {x: 10500, y: 4500}, {x: 13000, y: 6000}, {x: 11000, y: 8000}, {x: 8000, y: 6500}, {x: 7000, y: 9000}, {x: 5000, y: 7000}, {x: 3000, y: 9500}, {x: 1500, y: 7500}, {x: 2500, y: 5000}, {x: 800, y: 4500}, {x: 800, y: 1000}, {x: 3000, y: 1000}]
-    },
-    preset2: { 
-        points: [{x: 3000, y: 1000}, {x: 10000, y: 1000}, {x: 13000, y: 2000}, {x: 14000, y: 5000}, {x: 12000, y: 8500}, {x: 9000, y: 9500}, {x: 6000, y: 8000}, {x: 4000, y: 9500}, {x: 1000, y: 8500}, {x: 500, y: 5000}, {x: 800, y: 1000}, {x: 3000, y: 1000}]
-    },
-    preset3: { 
-        points: [{x: 3000, y: 1000}, {x: 9000, y: 1000}, {x: 9000, y: 2500}, {x: 2000, y: 2500}, {x: 2000, y: 4000}, {x: 11000, y: 4000}, {x: 11000, y: 5500}, {x: 1500, y: 5500}, {x: 1500, y: 7000}, {x: 12000, y: 7000}, {x: 12000, y: 8500}, {x: 1000, y: 8500}, {x: 1000, y: 1000}, {x: 3000, y: 1000}]
-    },
-    preset4: { 
-        points: [{x: 3000, y: 1000}, {x: 6000, y: 1000}, {x: 4000, y: 2500}, {x: 8000, y: 2500}, {x: 6000, y: 4500}, {x: 10000, y: 4500}, {x: 8000, y: 6500}, {x: 12000, y: 6500}, {x: 1000, y: 8000}, {x: 1000, y: 1000}, {x: 3000, y: 1000}]
-    },
-    preset5: { 
-        points: [{x: 3000, y: 1000}, {x: 10000, y: 1000}, {x: 12000, y: 5000}, {x: 10000, y: 9000}, {x: 4000, y: 9000}, {x: 2000, y: 5000}, {x: 4000, y: 2500}, {x: 8000, y: 2500}, {x: 9000, y: 5000}, {x: 8000, y: 7500}, {x: 4000, y: 7500}, {x: 800, y: 1000}, {x: 3000, y: 1000}]
-    }
-};
-
 // 1. ИНИЦИАЛИЗАЦИЯ БАЗОВОЙ ТРАССЫ (до всех функций)
-let trackData = trackPresets.preset1;
-let trackPoints = trackPresets.preset1.points;
-let trackHazards = { nitro: [] };
+// Переменные уже объявлены в начале файла
 
 function generateHazardsForTrack(points) {
     if (!points || points.length < 4) return { nitro: [] };
@@ -418,9 +420,7 @@ function generateHazardsForTrack(points) {
 }
 
 // Теперь инициализируем опасности
-trackHazards = generateHazardsForTrack(trackPoints);
-
-const roadWidth = 400; 
+if (trackPoints) trackHazards = generateHazardsForTrack(trackPoints);
 
 function distToSegment(p, v, w) {
     if (!v || !w) return 10000;
@@ -441,7 +441,6 @@ function checkOffRoad(x, y) {
 }
 
 const scenery = [];
-const tribunes = [];
 let lastCheerTime = 0;
 
 function generateScenery() {
@@ -1036,6 +1035,14 @@ function drawPodium() {
 function render() {
     try {
         if (!canvas || !ctx) return;
+        
+        // ЕСЛИ ИГРА ЕЩЕ НЕ НАЧАТА - НИЧЕГО НЕ РИСУЕМ (чтобы не перекрывать меню)
+        if (!gameStarted) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(render);
+            return;
+        }
+        
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
         if (!trackPoints || trackPoints.length < 2 || !localPlayer) {
@@ -1044,7 +1051,7 @@ function render() {
             ctx.fillStyle = '#fff';
             ctx.font = '20px Courier New';
             ctx.textAlign = 'center';
-            ctx.fillText('LOADING TRACK DATA...', canvas.width/2, canvas.height/2);
+            ctx.fillText('PREPARING TRACK...', canvas.width/2, canvas.height/2);
             requestAnimationFrame(render);
             return;
         }
