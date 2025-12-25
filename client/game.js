@@ -383,8 +383,20 @@ socket.on('playerDisconnected', (id) => { delete players[id]; updateColorUI(); }
 
 function updateColorUI() { 
     carOptions.forEach(opt => { 
-        const isTakenByOther = Object.values(players).some(p => p.ready && p.id !== myId && p.color === opt.dataset.color); 
-        opt.style.opacity = isTakenByOther ? '0.3' : '1'; opt.style.pointerEvents = isTakenByOther ? 'none' : 'auto'; opt.style.filter = isTakenByOther ? 'grayscale(1)' : 'none'; 
+        // Цвет занят, если его выбрал любой ДРУГОЙ игрок в лобби (даже если он еще не нажал Start)
+        const isTakenByOther = Object.values(players).some(p => p.id !== myId && p.color === opt.dataset.color); 
+        opt.style.opacity = isTakenByOther ? '0.3' : '1'; 
+        opt.style.pointerEvents = isTakenByOther ? 'none' : 'auto'; 
+        opt.style.filter = isTakenByOther ? 'grayscale(1)' : 'none'; 
+        
+        // Подсвечиваем НАШ выбранный цвет
+        if (opt.dataset.color === localPlayer.color) {
+            opt.style.borderColor = '#55ff55';
+            opt.style.boxShadow = '0 0 15px #55ff55';
+        } else {
+            opt.style.borderColor = '#555';
+            opt.style.boxShadow = 'none';
+        }
     }); 
 }
 

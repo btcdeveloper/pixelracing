@@ -62,9 +62,10 @@ io.on('connection', (socket) => {
             }
 
             const colorToUse = data.color || players[socket.id].color;
-            const isTakenByOther = Object.values(players).some(p => p.ready && p.id !== socket.id && p.color === colorToUse);
+            const isTakenByOther = Object.values(players).some(p => p.id !== socket.id && p.color === colorToUse);
             
             if (isTakenByOther) {
+                // Если цвет все-таки заняли, пока мы нажимали кнопку - даем новый рандом
                 players[socket.id].color = '#' + Math.floor(Math.random()*16777215).toString(16);
             } else {
                 players[socket.id].color = colorToUse;
