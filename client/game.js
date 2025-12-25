@@ -314,12 +314,14 @@ window.addEventListener('wheel', (e) => {
     targetZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
 }, { passive: true });
 
-document.getElementById('zoomIn').addEventListener('click', () => {
-    targetZoom = Math.min(maxZoom, targetZoom * 1.5);
+document.getElementById('zoomIn').addEventListener('click', (e) => {
+    e.preventDefault();
+    targetZoom = Math.min(maxZoom, targetZoom * 1.4);
 });
 
-document.getElementById('zoomOut').addEventListener('click', () => {
-    targetZoom = Math.max(minZoom, targetZoom / 1.5);
+document.getElementById('zoomOut').addEventListener('click', (e) => {
+    e.preventDefault();
+    targetZoom = Math.max(minZoom, targetZoom / 1.4);
 });
 
 let myId = null, players = {}, gameState = 'LOBBY', gameStarted = false, winnersList = [], fireworks = [], targetLaps = 5;
@@ -718,8 +720,9 @@ function update() {
     if (gameState === 'LOBBY') {
         const moveUp = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц || keys.Enter || keys[' '];
         
-        // Используем статус из объекта игрока, который прислал сервер
-        if (moveUp && localPlayer.isHost) {
+        // Прямая проверка из актуального списка игроков
+        const me = players[socket.id];
+        if (moveUp && me && me.isHost) {
             socket.emit('startGame');
         }
         updateEngineSound(0); return;
@@ -1106,7 +1109,12 @@ function render() {
             ctx.fillText('GRAND PRIX LOBBY', canvas.width/2, canvas.height/2 - 50);
             
             ctx.font = '24px Courier New';
-            if (localPlayer.isHost) {
+            
+            // ПРОВЕРКА ЧЕРЕЗ players[socket.id] САМАЯ НАДЕЖНАЯ
+            const me = players[socket.id] || localPlayer;
+            const amIHost = me.isHost;
+
+            if (amIHost) {
                  ctx.fillStyle = '#55ff55';
                  ctx.fillText('YOU ARE THE HOST', canvas.width/2, canvas.height/2);
                  ctx.fillStyle = '#fff';
