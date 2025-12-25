@@ -5,6 +5,15 @@ console.log("Pixel Racing Engine v1.2 Initializing...");
 
 const socket = io();
 
+// 1. СНАЧАЛА ОБЪЯВЛЯЕМ ВСЕ БАЗОВЫЕ ОБЪЕКТЫ
+let localPlayer = {
+    id: null, x: 2800, y: 1000, angle: 0, speed: 0,
+    nickname: '', color: '#ff0000', laps: 0,
+    lastPassedFinish: false, ready: false, checkpointHit: false,
+    steering: 0, currentLapTime: 0, bestLapTime: Infinity,
+    isHost: false, roomId: null
+};
+
 // --- ПРЕСЕТЫ ТРАСС ---
 const trackPresets = {
     preset1: { 
@@ -24,7 +33,7 @@ const trackPresets = {
     }
 };
 
-// --- БАЗОВЫЕ ПЕРЕМЕННЫЕ СОСТОЯНИЯ ---
+// --- ПЕРЕМЕННЫЕ СОСТОЯНИЯ ---
 let myId = null, players = {}, gameState = 'LOBBY', gameStarted = false, winnersList = [], fireworks = [], targetLaps = 5;
 let trackPoints = trackPresets.preset1.points, trackHazards = null, trackData = trackPresets.preset1, trees = [], tribunes = [];
 const roadWidth = 400;
@@ -36,70 +45,16 @@ const maxZoom = 4.0;
 
 let cameraX = 3000;
 let cameraY = 1000;
-let isDragging = false;
-let lastMouseX = 0;
-let lastMouseY = 0;
-let cameraOffsetX = 0;
-let cameraOffsetY = 0;
 
-let localPlayer = {
-    id: null, x: 2800, y: 1000, angle: 0, speed: 0,
-    nickname: '', color: '#ff0000', laps: 0,
-    lastPassedFinish: false, ready: false, checkpointHit: false,
-    steering: 0, currentLapTime: 0, bestLapTime: Infinity,
-    isHost: false, roomId: null
-};
-
-// --- СОБЫТИЯ МЫШИ ДЛЯ ЗУМА И ТАСКАНИЯ ---
-window.addEventListener('mousedown', (e) => {
-    if (e.target === canvas) {
-        isDragging = true;
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-    }
-});
-
-window.addEventListener('mousemove', (e) => {
-    if (isDragging) {
-        const dx = (e.clientX - lastMouseX) / zoomLevel;
-        const dy = (e.clientY - lastMouseY) / zoomLevel;
-        cameraOffsetX -= dx;
-        cameraOffsetY -= dy;
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-    }
-});
-
-window.addEventListener('mouseup', () => {
-    isDragging = false;
-});
-
-window.addEventListener('wheel', (e) => {
-    const zoomFactor = 1.15;
-    if (e.deltaY > 0) targetZoom /= zoomFactor;
-    else targetZoom *= zoomFactor;
-    targetZoom = Math.max(minZoom, Math.min(maxZoom, targetZoom));
-}, { passive: true });
-
-document.getElementById('zoomIn').addEventListener('click', (e) => {
-    e.preventDefault();
-    targetZoom = Math.min(maxZoom, targetZoom * 1.4);
-});
-
-document.getElementById('zoomOut').addEventListener('click', (e) => {
-    e.preventDefault();
-    targetZoom = Math.max(minZoom, targetZoom / 1.4);
-});
+// ... (остальной код)
 
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    // Сбрасываем камеру на игрока, чтобы избежать "улета" в пустоту
     if (localPlayer) {
         cameraX = localPlayer.x;
         cameraY = localPlayer.y;
     }
-    console.log("Canvas stabilized after resize");
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas(); 
