@@ -7,7 +7,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3005;
 
 app.use(express.static(path.join(__dirname, '../client')));
 
@@ -199,9 +199,27 @@ io.on('connection', (socket) => {
 
     socket.on('forceReset', () => {
         const result = findSocketPlayer(socket.id);
-        if (result && room.hostId === socket.id) {
+        if (result && result.room.hostId === socket.id) {
             const room = result.room;
-            // ... остальное без изменений
+            room.gameState = 'LOBBY';
+            room.winners = [];
+            const trackPoints = room.trackData.points || room.trackData;
+            const startX = trackPoints ? trackPoints[0].x - 200 : 2800;
+            const startY = trackPoints ? trackPoints[0].y : 1000;
+
+            Object.values(room.players).forEach((p, idx) => {
+                p.laps = 0;
+                p.bestLapTime = null;
+                p.finished = false;
+                p.x = startX;
+                p.y = startY + (idx * 70);
+                p.angle = 0;
+                p.ready = true;
+                p.isHost = (p.id === room.hostId);
+            });
+            io.to(room.id).emit('gameStateUpdate', room.gameState);
+            io.to(room.id).emit('currentPlayers', room.players);
+            io.emit('roomList', getRoomList());
         }
     });
 

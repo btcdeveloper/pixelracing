@@ -283,7 +283,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.5);
             padding: 20px;
             text-align: center;
             border: 4px solid #fff;
@@ -485,8 +485,8 @@
             
             <!-- Начальный экран -->
             <div id="main-menu" class="menu-screen active">
-                <button id="showCreateBtn" class="menu-btn">Create Race</button>
-                <button id="showJoinBtn" class="menu-btn">Join Race</button>
+                <button id="showCreateBtn" class="menu-btn">CREATE RACE</button>
+                <button id="showJoinBtn" class="menu-btn">JOIN RACE</button>
             </div>
 
             <!-- Экран создания гонки -->
@@ -544,8 +544,21 @@
             <button id="resumeBtn" class="pause-btn">RESUME</button>
             <button id="endRaceBtn" class="pause-btn">END RACE</button>
         </div>
-        <div id="lobby-ui" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 30px; border: 4px solid #fff; text-align: center; z-index: 150; min-width: 300px;">
+        <div id="lobby-ui" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 30px; border: 4px solid #fff; text-align: center; z-index: 150; min-width: 400px;">
             <h2 style="margin-bottom: 20px; color: #55ff55;">WAITING FOR PLAYERS</h2>
+            
+            <!-- Выбор цвета прямо в лобби -->
+            <div style="margin-bottom: 20px;">
+                <p style="margin-bottom: 10px; font-size: 0.9rem; color: #aaa;">CHANGE COLOR:</p>
+                <div class="car-selection" id="carSelection-lobby">
+                    <div class="car-option" data-color="#ff0000" style="background: #ff0000;"></div>
+                    <div class="car-option" data-color="#00ff00" style="background: #00ff00;"></div>
+                    <div class="car-option" data-color="#0000ff" style="background: #0000ff;"></div>
+                    <div class="car-option" data-color="#ffff00" style="background: #ffff00;"></div>
+                    <div class="car-option" data-color="#ff00ff" style="background: #ff00ff;"></div>
+                </div>
+            </div>
+
             <div id="lobby-player-list" style="margin-bottom: 30px; display: flex; flex-direction: column; gap: 10px; text-align: left;">
                 <!-- Список игроков будет тут -->
             </div>
@@ -555,7 +568,7 @@
         <audio id="bgMusicElement" loop crossorigin="anonymous"></audio>
     </div>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="game.js?v=1.3"></script>
+    <script src="game.js?v=1.8"></script>
 </body>
 </html>
 
