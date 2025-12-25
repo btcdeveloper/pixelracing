@@ -566,33 +566,33 @@ window.addEventListener('mousedown', forceStartAudio);
 
 function updateLobbyUI() {
     if (!gameStarted || gameState !== 'LOBBY') {
-        lobbyUi.style.display = 'none';
+        if (lobbyUi) lobbyUi.style.display = 'none';
         return;
     }
 
-    lobbyUi.style.display = 'block';
-    lobbyPlayerList.innerHTML = '';
-    
-    const playerArray = Object.values(players);
-    playerArray.forEach(p => {
-        const div = document.createElement('div');
-        div.style.padding = '10px';
-        div.style.background = 'rgba(255,255,255,0.1)';
-        div.style.borderLeft = `5px solid ${p.color}`;
-        div.innerHTML = `<strong>${p.nickname}</strong> ${p.id === socket.id ? '(You)' : ''}`;
-        lobbyPlayerList.appendChild(div);
-    });
+    if (lobbyUi) {
+        lobbyUi.style.display = 'block';
+        lobbyPlayerList.innerHTML = '';
+        
+        const playerArray = Object.values(players);
+        playerArray.forEach(p => {
+            const div = document.createElement('div');
+            div.style.padding = '10px';
+            div.style.background = 'rgba(255,255,255,0.1)';
+            div.style.borderLeft = `5px solid ${p.color}`;
+            div.innerHTML = `<strong>${p.nickname}</strong> ${p.id === myId ? '(You)' : ''}`;
+            lobbyPlayerList.appendChild(div);
+        });
 
-    // Хост — это тот, чей ID совпадает с ID комнаты
-    // Поскольку при создании комнаты мы записываем socket.id в localPlayer.roomId
-    const isHost = (localPlayer.roomId === socket.id);
-    
-    if (isHost) {
-        forceStartBtn.style.display = 'block';
-        notHostMsg.style.display = 'none';
-    } else {
-        forceStartBtn.style.display = 'none';
-        notHostMsg.style.display = 'block';
+        const isHost = (localPlayer.roomId === myId);
+        
+        if (isHost) {
+            forceStartBtn.style.display = 'block';
+            notHostMsg.style.display = 'none';
+        } else {
+            forceStartBtn.style.display = 'none';
+            notHostMsg.style.display = 'block';
+        }
     }
 }
 
@@ -708,8 +708,12 @@ function update() {
     
     if (gameState === 'LOBBY') {
         const upPressed = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц || keys.Enter || keys[' '];
-        // Убираем автостарт по клавише, оставляем только кнопку
-        // if (upPressed) socket.emit('startGame');
+        
+        // Разрешаем хосту стартовать и по клавише, и по кнопке
+        const isHost = (localPlayer.roomId === myId);
+        if (upPressed && isHost) {
+            socket.emit('startGame');
+        }
         updateEngineSound(0); return;
     }
     if (gameState === 'FINISHED') { updateEngineSound(0); updateFireworks(); return; }
@@ -1038,11 +1042,16 @@ function drawPodium() {
 
 function render() {
     try {
+        if (!canvas || !ctx) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        if (!trackPoints || trackPoints.length < 2) {
+        if (!trackPoints || trackPoints.length < 2 || !localPlayer) {
             ctx.fillStyle = '#1a5e1a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('LOADING TRACK DATA...', canvas.width/2, canvas.height/2);
             requestAnimationFrame(render);
             return;
         }
@@ -1083,20 +1092,19 @@ function render() {
             ctx.fillStyle = '#fff'; ctx.font = 'bold 40px Courier New'; ctx.textAlign = 'center';
             ctx.fillText('GRAND PRIX LOBBY', canvas.width/2, canvas.height/2 - 50);
             
-            // Проверка на хоста для отображения нужной инструкции
-            const isHost = (myId === socket.id); 
-            // В нашей системе roomId создателя совпадает с его socket.id, 
-            // но на клиенте мы можем просто проверить, активна ли комната с нашим ID
-            
+            const isHost = (localPlayer.roomId === myId);
             ctx.font = '24px Courier New';
-            if (myId === myId) { // Временно упростим, сервер сам разберется
+            if (isHost) {
                  ctx.fillStyle = '#55ff55';
-                 ctx.fillText('WAITING FOR PLAYERS...', canvas.width/2, canvas.height/2);
+                 ctx.fillText('YOU ARE THE HOST', canvas.width/2, canvas.height/2);
                  ctx.fillStyle = '#fff';
-                 ctx.fillText('CLICK THE START BUTTON TO BEGIN', canvas.width/2, canvas.height/2 + 50);
+                 ctx.fillText('PRESS "W" OR CLICK BUTTON TO START', canvas.width/2, canvas.height/2 + 50);
+            } else {
+                 ctx.fillStyle = '#aaa';
+                 ctx.fillText('WAITING FOR HOST TO START...', canvas.width/2, canvas.height/2);
             }
             
-            ctx.font = '16px Courier New'; ctx.fillStyle = '#aaa';
+            ctx.font = '16px Courier New'; ctx.fillStyle = '#888';
             ctx.fillText('USE MOUSE WHEEL TO ZOOM', canvas.width/2, canvas.height/2 + 100);
         } else if (gameState === 'FINISHED') {
             ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
