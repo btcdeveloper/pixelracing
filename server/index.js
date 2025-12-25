@@ -189,23 +189,17 @@ io.on('connection', (socket) => {
         const result = findSocketPlayer(socket.id);
         if (result && result.room.id === socket.id) {
             const room = result.room;
-            room.gameState = 'LOBBY';
-            room.winners = [];
-            const trackPoints = room.trackData.points || room.trackData;
-            const startX = trackPoints ? trackPoints[0].x - 200 : 2800;
-            const startY = trackPoints ? trackPoints[0].y : 1000;
-
-            Object.values(room.players).forEach((p, idx) => {
-                p.laps = 0;
-                p.bestLapTime = null;
-                p.finished = false;
-                p.x = startX;
-                p.y = startY + (idx * 70);
-                p.angle = 0;
-                p.ready = false; 
+            // Уведомляем всех в комнате, что пора вернуться в главное меню
+            io.to(room.id).emit('backToMainMenu');
+            
+            // Очищаем комнату для сервера
+            const playerIds = Object.keys(room.players);
+            playerIds.forEach(id => {
+                const s = io.sockets.sockets.get(id);
+                if (s) s.leave(room.id);
             });
-            io.to(room.id).emit('gameStateUpdate', room.gameState);
-            io.to(room.id).emit('currentPlayers', room.players);
+            delete rooms[room.id];
+            
             io.emit('roomList', getRoomList());
         }
     });

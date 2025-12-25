@@ -586,27 +586,37 @@ socket.on('gameStateUpdate', (state, winners) => {
     if (gameStarted && musicEnabled) playMusic(); 
     
     if (state === 'RACING') {
-        localPlayer.currentLapTime = 0; // Сбрасываем время при старте гонки
+        localPlayer.currentLapTime = 0; 
     }
 
     if (state === 'LOBBY') { 
-        gameStarted = false;
-        ui.style.display = 'block';
+        // В лобби комнаты мы НЕ показываем основное меню и НЕ сбрасываем gameStarted
         if (pauseMenu) pauseMenu.style.display = 'none';
-        
-        // Скрываем игровой интерфейс
-        document.getElementById('speedometer').style.display = 'none';
-        document.getElementById('lap-counter').style.display = 'none';
-        document.getElementById('lap-timer').style.display = 'none';
-        document.getElementById('zoom-controls').style.display = 'none';
-
-        localPlayer.ready = false;
         localPlayer.laps = 0; localPlayer.speed = 0; fireworks = []; wheelParticles = [];
         localPlayer.currentLapTime = 0; localPlayer.bestLapTime = Infinity;
         if (currentLapEl) currentLapEl.textContent = `LAP: 00:00.00`;
         if (bestLapEl) bestLapEl.textContent = `BEST: --:--.--`;
         const rBtn = document.getElementById('resetBtn'); if (rBtn) rBtn.remove(); 
     } 
+});
+
+socket.on('backToMainMenu', () => {
+    gameStarted = false;
+    gameState = 'LOBBY';
+    ui.style.display = 'block';
+    mainMenu.classList.add('active');
+    createMenu.classList.remove('active');
+    joinMenu.classList.remove('active');
+    
+    // Скрываем игровой интерфейс
+    document.getElementById('speedometer').style.display = 'none';
+    document.getElementById('lap-counter').style.display = 'none';
+    document.getElementById('lap-timer').style.display = 'none';
+    document.getElementById('zoom-controls').style.display = 'none';
+    
+    // Сбрасываем игрока
+    localPlayer.ready = false;
+    players = {};
 });
 socket.on('playerDisconnected', (id) => { delete players[id]; updateColorUI(); });
 
