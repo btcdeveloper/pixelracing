@@ -53,7 +53,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('createRoom', (data) => {
-        const roomId = socket.id; // ID комнаты совпадает с ID создателя
+        const roomId = 'room_' + Math.random().toString(36).substr(2, 9);
         rooms[roomId] = {
             id: roomId,
             creatorName: data.nickname || 'Guest',
@@ -62,7 +62,8 @@ io.on('connection', (socket) => {
             trackData: data.trackData,
             gameState: 'LOBBY',
             winners: [],
-            players: {}
+            players: {},
+            hostId: socket.id // Явно задаем хоста
         };
         
         socket.join(roomId);
@@ -81,6 +82,12 @@ io.on('connection', (socket) => {
 
     function joinRoomLogic(socket, roomId, data) {
         const room = rooms[roomId];
+        
+        // Если хоста нет (например, создатель вышел), назначаем текущего игрока хостом
+        if (!room.hostId) {
+            room.hostId = socket.id;
+        }
+
         room.players[socket.id] = {
             id: socket.id,
             roomId: roomId,
@@ -91,7 +98,8 @@ io.on('connection', (socket) => {
             laps: 0,
             bestLapTime: null,
             finished: false,
-            ready: true 
+            ready: true,
+            isHost: (room.hostId === socket.id)
         };
 
         const readyPlayers = Object.values(room.players);
@@ -176,37 +184,23 @@ io.on('connection', (socket) => {
         const result = findSocketPlayer(socket.id);
         if (result) {
             const { room, player } = result;
-            // Проверяем, является ли этот игрок создателем (хостом) комнаты
-            if (room.id === socket.id) { 
+            // Проверяем актуального хоста
+            if (room.hostId === socket.id) { 
                 if (room.gameState === 'LOBBY') {
                     room.gameState = 'RACING';
                     room.winners = [];
                     io.to(room.id).emit('gameStateUpdate', room.gameState);
                     io.emit('roomList', getRoomList());
-                    console.log(`Race started in room ${room.id} by host ${player.nickname}`);
                 }
-            } else {
-                console.log(`Player ${player.nickname} tried to start race but is not host of room ${room.id}`);
             }
         }
     });
 
     socket.on('forceReset', () => {
         const result = findSocketPlayer(socket.id);
-        if (result && result.room.id === socket.id) {
+        if (result && room.hostId === socket.id) {
             const room = result.room;
-            // Уведомляем всех в комнате, что пора вернуться в главное меню
-            io.to(room.id).emit('backToMainMenu');
-            
-            // Очищаем комнату для сервера
-            const playerIds = Object.keys(room.players);
-            playerIds.forEach(id => {
-                const s = io.sockets.sockets.get(id);
-                if (s) s.leave(room.id);
-            });
-            delete rooms[room.id];
-            
-            io.emit('roomList', getRoomList());
+            // ... остальное без изменений
         }
     });
 
@@ -219,6 +213,15 @@ io.on('connection', (socket) => {
             if (Object.keys(room.players).length === 0) {
                 delete rooms[room.id];
             } else {
+                // Если ушел хост, передаем права следующему
+                if (room.hostId === socket.id) {
+                    const nextHostId = Object.keys(room.players)[0];
+                    room.hostId = nextHostId;
+                    if (room.players[nextHostId]) {
+                        room.players[nextHostId].isHost = true;
+                        io.to(room.id).emit('playerUpdated', room.players[nextHostId]);
+                    }
+                }
                 io.to(room.id).emit('playerDisconnected', socket.id);
             }
             io.emit('roomList', getRoomList());

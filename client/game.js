@@ -580,19 +580,22 @@ function updateLobbyUI() {
             div.style.padding = '10px';
             div.style.background = 'rgba(255,255,255,0.1)';
             div.style.borderLeft = `5px solid ${p.color}`;
-            div.innerHTML = `<strong>${p.nickname}</strong> ${p.id === myId ? '(You)' : ''}`;
+            // Добавляем значок короны для хоста
+            const hostIcon = p.isHost ? ' 👑' : '';
+            div.innerHTML = `<strong>${p.nickname}</strong> ${hostIcon} ${p.id === socket.id ? '(You)' : ''}`;
             lobbyPlayerList.appendChild(div);
         });
 
-    const isHost = (localPlayer.roomId === socket.id);
-    
-    if (isHost) {
-        forceStartBtn.style.display = 'block';
-        notHostMsg.style.display = 'none';
-    } else {
-        forceStartBtn.style.display = 'none';
-        notHostMsg.style.display = 'block';
-    }
+        // Проверяем статус хоста в локальном объекте (приходит с сервера)
+        const isHost = localPlayer.isHost;
+        
+        if (isHost) {
+            forceStartBtn.style.display = 'block';
+            notHostMsg.style.display = 'none';
+        } else {
+            forceStartBtn.style.display = 'none';
+            notHostMsg.style.display = 'block';
+        }
     }
 }
 
@@ -614,7 +617,8 @@ socket.on('playerUpdated', (playerInfo) => {
         localPlayer.laps = playerInfo.laps; 
         localPlayer.ready = true; 
         localPlayer.color = playerInfo.color; 
-        localPlayer.roomId = playerInfo.roomId; // Сохраняем ID комнаты
+        localPlayer.roomId = playerInfo.roomId; 
+        localPlayer.isHost = playerInfo.isHost; // СОХРАНЯЕМ СТАТУС ХОСТА
         if (playerInfo.bestLapTime !== undefined) localPlayer.bestLapTime = playerInfo.bestLapTime;
     } 
     updateColorUI(); 
