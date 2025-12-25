@@ -287,6 +287,9 @@ const forceStartAudio = () => {
 };
 window.addEventListener('mousedown', forceStartAudio);
 
+startBtn.addEventListener('click', joinGame);
+nicknameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') joinGame(); });
+
 carOptions.forEach(opt => { 
     opt.addEventListener('click', () => { 
         carOptions.forEach(o => {
