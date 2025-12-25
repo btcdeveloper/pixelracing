@@ -211,21 +211,35 @@ let trackPoints = trackPresets.preset1.points;
 let trackHazards = { nitro: [] };
 
 function generateHazardsForTrack(points) {
-    if (!points || points.length < 3) return { nitro: [] };
+    if (!points || points.length < 4) return { nitro: [] };
     const hazards = { nitro: [] };
-    // Пропускаем первый и последний сегменты (стартовая прямая)
+    
+    // Проходим по сегментам
     for (let i = 1; i < points.length - 2; i++) {
         const p1 = points[i];
         const p2 = points[i+1];
-        if (!p1 || !p2) continue;
+        const p3 = points[i+2];
+        if (!p1 || !p2 || !p3) continue;
         
-        const t = 0.3 + Math.random() * 0.4;
-        const hx = p1.x + (p2.x - p1.x) * t;
-        const hy = p1.y + (p2.y - p1.y) * t;
+        // Угол текущего сегмента
+        const angle1 = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+        // Угол следующего сегмента
+        const angle2 = Math.atan2(p3.y - p2.y, p3.x - p2.x);
         
-        // Оставляем только нитро через один сегмент
-        if (i % 2 === 0) {
-            hazards.nitro.push({ x: hx, y: hy });
+        // Разница углов (насколько резкий поворот впереди)
+        let diff = Math.abs(angle1 - angle2);
+        if (diff > Math.PI) diff = Math.PI * 2 - diff;
+        
+        // Ставим нитро только если впереди нет резкого поворота (разница < 0.3 радиан ~ 17 градусов)
+        // И только на достаточно длинных участках
+        const segmentLen = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+        
+        if (diff < 0.3 && segmentLen > 1000) {
+            const t = 0.5; // Ставим ровно посередине прямого участка
+            const hx = p1.x + (p2.x - p1.x) * t;
+            const hy = p1.y + (p2.y - p1.y) * t;
+            
+            hazards.nitro.push({ x: hx, y: hy, angle: angle1 });
         }
     }
     return hazards;
@@ -650,6 +664,10 @@ function drawHazards() {
     trackHazards.nitro.forEach(n => {
         ctx.save();
         ctx.translate(n.x, n.y);
+        // Поворачиваем стрелку по направлению дороги
+        // Изначально стрелка рисуется "вверх", поэтому добавляем PI/2
+        if (n.angle !== undefined) ctx.rotate(n.angle + Math.PI / 2);
+        
         ctx.shadowBlur = 20; ctx.shadowColor = '#ffff00';
         ctx.fillStyle = '#ffff00';
         ctx.beginPath();
