@@ -516,6 +516,22 @@ function drawMinimap() {
     trackPoints.forEach(pt => ctx.lineTo(tmx(pt.x), tmy(pt.y)));
     ctx.stroke();
 
+    // Линия финиша на миникарте
+    if (trackPoints.length >= 2) {
+        const p1 = trackPoints[0], p2 = trackPoints[1];
+        const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+        ctx.save();
+        ctx.translate(tmx(p1.x), tmy(p1.y));
+        ctx.rotate(angle + Math.PI / 2);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(10, 0);
+        ctx.stroke();
+        ctx.restore();
+    }
+
     Object.values(players).forEach(p => {
         if (p.id === socket.id) return; // Себя нарисуем в конце
         ctx.fillStyle = p.color;
