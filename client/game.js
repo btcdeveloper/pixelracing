@@ -678,7 +678,11 @@ socket.on('backToMainMenu', () => {
     players = {};
     updateLobbyUI();
 });
-socket.on('playerDisconnected', (id) => { delete players[id]; updateColorUI(); });
+socket.on('playerDisconnected', (id) => { 
+    delete players[id]; 
+    updateColorUI(); 
+    updateLobbyUI(); // ОБНОВЛЯЕМ СПИСОК В ЛОББИ ПРИ ВЫХОДЕ ИГРОКА
+});
 
 function updateColorUI() { 
     carOptions.forEach(opt => { 
