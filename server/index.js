@@ -15,6 +15,10 @@ const players = {};
 let gameState = 'LOBBY';
 let winners = [];
 let targetLaps = 5; 
+let currentTrack = {
+    points: [{x: 3000, y: 1000}, {x: 7000, y: 1000}, {x: 8500, y: 2500}, {x: 10000, y: 1000}, {x: 12000, y: 3000}, {x: 10500, y: 4500}, {x: 13000, y: 6000}, {x: 11000, y: 8000}, {x: 8000, y: 6500}, {x: 7000, y: 9000}, {x: 5000, y: 7000}, {x: 3000, y: 9500}, {x: 1500, y: 7500}, {x: 2500, y: 5000}, {x: 800, y: 4500}, {x: 800, y: 1000}, {x: 3000, y: 1000}],
+    hazards: { nitro: [] } // Оставляем только нитро
+}; 
 
 io.on('connection', (socket) => {
     players[socket.id] = {
@@ -31,12 +35,21 @@ io.on('connection', (socket) => {
     socket.emit('currentPlayers', players);
     socket.emit('gameStateUpdate', gameState);
     socket.emit('updateTargetLaps', targetLaps);
+    if (currentTrack) socket.emit('updateTrack', currentTrack);
 
     socket.on('joinGame', (data) => {
         if (players[socket.id]) {
             if (data.laps) {
                 targetLaps = parseInt(data.laps);
                 io.emit('updateTargetLaps', targetLaps);
+            }
+            
+            // Трассу устанавливает только первый игрок или если она еще не выбрана
+            const readyPlayersBefore = Object.values(players).filter(p => p.ready);
+            const incomingTrackData = data.trackData;
+            if (incomingTrackData && (readyPlayersBefore.length === 0 || gameState === 'LOBBY')) {
+                currentTrack = incomingTrackData;
+                io.emit('updateTrack', currentTrack);
             }
 
             const colorToUse = data.color || players[socket.id].color;
@@ -54,8 +67,12 @@ io.on('connection', (socket) => {
             const readyPlayers = Object.values(players).filter(p => p.ready);
             const myIndex = readyPlayers.findIndex(p => p.id === socket.id);
             
-            players[socket.id].x = 310; 
-            players[socket.id].y = 160 + (myIndex * 35);
+            const trackPoints = currentTrack.points || currentTrack;
+            const startX = trackPoints ? trackPoints[0].x - 200 : 2800;
+            const startY = trackPoints ? trackPoints[0].y : 1000;
+
+            players[socket.id].x = startX; 
+            players[socket.id].y = startY + (myIndex * 70);
             players[socket.id].angle = 0;
             
             io.emit('playerUpdated', players[socket.id]);
@@ -70,6 +87,12 @@ io.on('connection', (socket) => {
             players[socket.id].y = movementData.y;
             players[socket.id].angle = movementData.angle;
             socket.broadcast.emit('playerMoved', players[socket.id]);
+        }
+    });
+
+    socket.on('sendEmoji', (emoji) => {
+        if (players[socket.id]) {
+            io.emit('emojiReceived', { id: socket.id, emoji: emoji });
         }
     });
 
@@ -99,12 +122,18 @@ io.on('connection', (socket) => {
         if (gameState === 'FINISHED') {
             gameState = 'LOBBY';
             winners = [];
+            // При сбросе игры в лобби, трасса тоже может быть перевыбрана
             const readyOnes = Object.values(players).filter(p => p.ready);
+            
+            const trackPoints = currentTrack.points || currentTrack;
+            const startX = trackPoints ? trackPoints[0].x - 200 : 2800;
+            const startY = trackPoints ? trackPoints[0].y : 1000;
+
             readyOnes.forEach((p, idx) => {
                 p.laps = 0;
                 p.finished = false;
-                p.x = 310;
-                p.y = 160 + (idx * 35);
+                p.x = startX;
+                p.y = startY + (idx * 70);
                 p.angle = 0;
             });
             io.emit('gameStateUpdate', gameState);
@@ -129,6 +158,6 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });

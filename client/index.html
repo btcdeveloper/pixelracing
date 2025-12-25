@@ -34,23 +34,105 @@
         }
         #audio-controls {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 20px;
+            right: 20px;
             display: flex;
-            gap: 10px;
+            gap: 20px;
             z-index: 100;
         }
-        .audio-btn {
-            background: rgba(0,0,0,0.6);
+        .audio-group {
+            position: relative;
+            padding-bottom: 20px; /* Создаем невидимый мостик между кнопкой и меню */
+        }
+        .audio-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: #222;
+            border: 4px solid #fff;
+            padding: 15px;
+            margin-top: -5px; /* Соединяем вплотную с зоной падинга */
+            box-shadow: 10px 10px 0 rgba(0,0,0,0.5);
+            min-width: 220px; /* Увеличили ширину, чтобы ползунок не вылезал */
+            flex-direction: column;
+            gap: 15px;
+        }
+        .audio-dropdown::before {
+            content: '';
+            position: absolute;
+            top: -18px;
+            right: 20px;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 14px solid #fff;
+        }
+        .audio-group:hover .audio-dropdown {
+            display: flex;
+        }
+        .dropdown-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
             color: #fff;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            font-weight: bold;
+            width: 100%; /* Занимаем всю ширину */
+        }
+        .dropdown-item label {
+            letter-spacing: 1px;
+            color: #aaa;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%; /* Теперь точно влезет */
+            box-sizing: border-box;
+            height: 12px;
+            background: #444;
             border: 2px solid #fff;
-            padding: 5px 10px;
+            outline: none;
+            margin: 5px 0;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 25px;
+            background: #55ff55;
+            border: 2px solid #fff;
+            cursor: pointer;
+        }
+        .dropdown-item select {
+            background: #000;
+            color: #55ff55;
+            border: 2px solid #fff;
+            padding: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            cursor: pointer;
+            outline: none;
+        }
+        .audio-btn {
+            background: #000;
+            color: #fff;
+            border: 4px solid #fff;
+            padding: 8px 15px;
             cursor: pointer;
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.1s;
+            box-shadow: 4px 4px 0 #555;
+        }
+        .audio-btn:active {
+            box-shadow: 0 0 0;
+            transform: translate(4px, 4px);
         }
         .audio-btn:hover {
-            background: rgba(255,255,255,0.2);
+            background: #333;
+            color: #55ff55;
+            border-color: #55ff55;
         }
         #speedometer {
             position: absolute;
@@ -79,6 +161,39 @@
             color: #ccc;
             margin-top: 5px;
         }
+        #zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+        .zoom-btn {
+            width: 50px;
+            height: 50px;
+            background: #000;
+            color: #fff;
+            border: 4px solid #fff;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 4px 4px 0 #555;
+            transition: all 0.1s;
+        }
+        .zoom-btn:active {
+            box-shadow: 0 0 0;
+            transform: translate(4px, 4px);
+        }
+        .zoom-btn:hover {
+            background: #333;
+            color: #55ff55;
+            border-color: #55ff55;
+        }
         .lap-selection {
             margin: 15px 0;
             display: flex;
@@ -90,6 +205,24 @@
             font-size: 1rem;
         }
         select#lapCount {
+            padding: 5px;
+            background: #333;
+            color: #fff;
+            border: 2px solid #fff;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .track-selection {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .track-selection label {
+            font-size: 1rem;
+        }
+        select#trackSelect {
             padding: 5px;
             background: #333;
             color: #fff;
@@ -148,13 +281,44 @@
 <body>
     <div id="game-container">
         <canvas id="gameCanvas" width="1200" height="800"></canvas>
-        <div id="audio-controls">
-            <button id="toggleMusic" class="audio-btn">Music: ON</button>
-            <button id="toggleEngine" class="audio-btn">Engine: ON</button>
-        </div>
+            <div id="audio-controls">
+                <div class="audio-group">
+                    <button id="toggleMusic" class="audio-btn">Music: ON ▾</button>
+                    <div class="audio-dropdown">
+                        <div class="dropdown-item">
+                            <label>Volume:</label>
+                            <input type="range" id="musicVolume" min="0" max="1" step="0.1" value="0.5">
+                        </div>
+                        <div class="dropdown-item">
+                            <label>Track:</label>
+                            <select id="musicTrack">
+                                <option value="0">Nine Thou</option>
+                                <option value="1">Do Ya Thang</option>
+                                <option value="2">I Am Rock</option>
+                                <option value="3">In a Hood Near You</option>
+                                <option value="4">Lets Move</option>
+                                <option value="5">Fired Up</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="audio-group">
+                    <button id="toggleEngine" class="audio-btn">Engine: ON ▾</button>
+                    <div class="audio-dropdown">
+                        <div class="dropdown-item">
+                            <label>Volume:</label>
+                            <input type="range" id="engineVolume" min="0" max="1" step="0.1" value="0.5">
+                        </div>
+                    </div>
+                </div>
+            </div>
         <div id="speedometer">
             <div id="speed-value">0</div>
             <div id="speed-unit">KM/H</div>
+        </div>
+        <div id="zoom-controls">
+            <button id="zoomOut" class="zoom-btn">-</button>
+            <button id="zoomIn" class="zoom-btn">+</button>
         </div>
         <div id="ui">
             <h1>PIXEL RACING</h1>
@@ -174,8 +338,19 @@
                     <option value="15">15 Laps</option>
                 </select>
             </div>
+            <div class="track-selection">
+                <label for="trackSelect">SELECT TRACK:</label>
+                <select id="trackSelect">
+                    <option value="preset1">GRAND PRIX (ORIGINAL)</option>
+                    <option value="preset2">SPEEDWAY (OVAL)</option>
+                    <option value="preset3">HAIRPIN CITY</option>
+                    <option value="preset4">ZIGZAG MOUNTAINS</option>
+                    <option value="preset5">THE LOOP</option>
+                </select>
+            </div>
             <button id="startBtn">START RACE</button>
         </div>
+        <audio id="bgMusicElement" loop crossorigin="anonymous"></audio>
     </div>
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
