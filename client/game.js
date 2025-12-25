@@ -1,16 +1,18 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+console.log("Pixel Racing Engine v1.2 Initializing...");
+
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    // Сбрасываем центрирование UI если нужно
+    console.log("Canvas resized to:", canvas.width, "x", canvas.height);
 }
 window.addEventListener('resize', resizeCanvas);
-resizeCanvas(); // Вызываем сразу
+resizeCanvas(); 
 
-// Убедимся, что рендер начнется с правильными размерами
-setTimeout(resizeCanvas, 100);
+// Повторный ресайз через короткое время, чтобы учесть скрытие панелей браузера
+setTimeout(resizeCanvas, 500);
 
 const ui = document.getElementById('ui');
 const nicknameInput = document.getElementById('nickname');
