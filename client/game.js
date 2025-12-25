@@ -287,8 +287,19 @@ const forceStartAudio = () => {
 };
 window.addEventListener('mousedown', forceStartAudio);
 
-startBtn.addEventListener('click', joinGame);
-nicknameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') joinGame(); });
+carOptions.forEach(opt => { 
+    opt.addEventListener('click', () => { 
+        carOptions.forEach(o => {
+            o.style.borderColor = '#555';
+            o.style.boxShadow = 'none';
+        });
+        opt.style.borderColor = '#55ff55';
+        opt.style.boxShadow = '0 0 10px #55ff55';
+        localPlayer.color = opt.dataset.color; 
+        // Сразу уведомляем сервер о выборе цвета, чтобы забронировать его
+        socket.emit('selectColor', localPlayer.color);
+    }); 
+});
 
 function joinGame() {
     initAudio();

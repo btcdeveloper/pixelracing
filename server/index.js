@@ -38,6 +38,14 @@ io.on('connection', (socket) => {
     socket.emit('updateTargetLaps', targetLaps);
     if (currentTrack) socket.emit('updateTrack', currentTrack);
 
+    socket.on('selectColor', (color) => {
+        if (players[socket.id]) {
+            players[socket.id].color = color;
+            // Уведомляем всех, что цвет забронирован, даже если игрок еще не нажал Start
+            io.emit('playerUpdated', players[socket.id]);
+        }
+    });
+
     socket.on('joinGame', (data) => {
         if (players[socket.id]) {
             if (data.laps) {
