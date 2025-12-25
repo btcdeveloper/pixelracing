@@ -23,6 +23,7 @@ const toggleEngineBtn = document.getElementById('toggleEngine');
 const speedValueEl = document.getElementById('speed-value');
 const currentLapEl = document.getElementById('current-lap');
 const bestLapEl = document.getElementById('best-lap');
+const lapValueEl = document.getElementById('lap-value');
 const lapCountSelect = document.getElementById('lapCount');
 const trackSelect = document.getElementById('trackSelect');
 
@@ -596,6 +597,10 @@ function update() {
         speedValueEl.style.color = displaySpeed > 250 ? '#f55' : (displaySpeed > 150 ? '#ff5' : '#5f5');
     }
 
+    if (lapValueEl) {
+        lapValueEl.textContent = `LAP ${localPlayer.laps}/${targetLaps}`;
+    }
+
     // Чекпоинт
     const midPointIdx = Math.floor(trackPoints.length / 2);
     const checkpoint = trackPoints[midPointIdx];
@@ -1052,11 +1057,12 @@ function drawLeaderboard() {
         ctx.arc(x + 35, py - 5, 6, 0, Math.PI * 2);
         ctx.fill();
 
-        // Никнейм
+        // Никнейм + Круги
         ctx.fillStyle = '#fff';
         const nickname = p.nickname || 'Guest';
-        const displayName = nickname.length > 10 ? nickname.substring(0, 10) + '..' : nickname;
-        ctx.fillText(displayName, x + 50, py);
+        const lapInfo = ` (L${p.laps})`;
+        const displayName = nickname.length > 8 ? nickname.substring(0, 8) + '..' : nickname;
+        ctx.fillText(displayName + lapInfo, x + 50, py);
 
         // Лучшее время
         ctx.textAlign = 'right';

@@ -153,6 +153,27 @@
             flex-direction: column;
             align-items: center;
         }
+        #lap-counter {
+            position: absolute;
+            top: 20px;
+            left: calc(50% - 280px);
+            background: rgba(0, 0, 0, 0.7);
+            border: 3px solid #fff;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            width: 140px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #lap-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fff;
+        }
         #lap-timer {
             position: absolute;
             top: 20px;
@@ -339,6 +360,9 @@
                     </div>
                 </div>
             </div>
+        <div id="lap-counter">
+            <div id="lap-value">LAP 0/5</div>
+        </div>
         <div id="speedometer">
             <div id="speed-value">0</div>
             <div id="speed-unit">KM/H</div>
