@@ -73,7 +73,6 @@ function createRoom() {
 
     localPlayer.nickname = nick;
     localPlayer.ready = true; // ГАРАНТИРУЕМ ОТРИСОВКУ
-    localPlayer.roomId = socket.id; // ПРИ СОЗДАНИИ ROOM ID = НАШ ID
     ui.style.display = 'none';
     
     // Показываем игровой интерфейс
@@ -105,7 +104,6 @@ function joinRoom(roomId) {
 
     localPlayer.nickname = nick;
     localPlayer.ready = true; // ГАРАНТИРУЕМ ОТРИСОВКУ
-    localPlayer.roomId = roomId; // ЗАПОМИНАЕМ ID КОМНАТЫ
     ui.style.display = 'none';
     
     // Показываем игровой интерфейс
@@ -339,7 +337,8 @@ let localPlayer = {
     id: null, x: 2800, y: 1000, angle: 0, speed: 0,
     nickname: '', color: '#ff0000', laps: 0,
     lastPassedFinish: false, ready: false, checkpointHit: false,
-    steering: 0, currentLapTime: 0, bestLapTime: Infinity
+    steering: 0, currentLapTime: 0, bestLapTime: Infinity,
+    isHost: false, roomId: null
 };
 
 function formatTime(ms) {
@@ -587,9 +586,7 @@ function updateLobbyUI() {
         });
 
         // Проверяем статус хоста в локальном объекте (приходит с сервера)
-        const isHost = localPlayer.isHost;
-        
-        if (isHost) {
+        if (localPlayer.isHost) {
             forceStartBtn.style.display = 'block';
             notHostMsg.style.display = 'none';
         } else {
@@ -720,10 +717,9 @@ function update() {
     
     if (gameState === 'LOBBY') {
         const moveUp = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц || keys.Enter || keys[' '];
-        const isHost = (localPlayer.roomId === socket.id);
         
-        if (moveUp && isHost) {
-            console.log("Host is starting the race...");
+        // Используем статус из объекта игрока, который прислал сервер
+        if (moveUp && localPlayer.isHost) {
             socket.emit('startGame');
         }
         updateEngineSound(0); return;
@@ -1069,6 +1065,7 @@ function render() {
         }
 
         // Плавная интерполяция зума (0.1 - коэффициент мягкости)
+        if (isNaN(zoomLevel)) zoomLevel = 1.0;
         zoomLevel += (targetZoom - zoomLevel) * 0.1;
 
         ctx.save();
@@ -1081,6 +1078,10 @@ function render() {
         const targetCamX = localPlayer.x + cameraOffsetX;
         const targetCamY = localPlayer.y + cameraOffsetY;
         
+        // Защита от NaN при ресайзе
+        if (isNaN(cameraX)) cameraX = targetCamX;
+        if (isNaN(cameraY)) cameraY = targetCamY;
+
         // Коэффициент 0.25 убирает дерганья, успевая за быстрым болидом
         cameraX += (targetCamX - cameraX) * 0.25;
         cameraY += (targetCamY - cameraY) * 0.25;
