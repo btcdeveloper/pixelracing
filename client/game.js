@@ -390,10 +390,16 @@ function loop() {
             if (gameState === 'RACING') {
                 const isOff = checkOffRoad(localPlayer.x, localPlayer.y);
                 const ACCEL = 0.055, FRICTION = 0.9975, MAX_S = 22.0, OFF_S = 5.0;
-                if (keys.w || keys.W || keys.ArrowUp) localPlayer.speed += ACCEL; else if (keys.s || keys.S || keys.ArrowDown) localPlayer.speed -= ACCEL;
+                
+                // Учитываем Caps Lock и разные раскладки (w/W, s/S)
+                if (keys.w || keys.W || keys.ArrowUp) localPlayer.speed += ACCEL; 
+                else if (keys.s || keys.S || keys.ArrowDown) localPlayer.speed -= ACCEL;
+                
                 localPlayer.speed *= FRICTION; nitroBoost *= 0.96;
                 const ts = localPlayer.speed + nitroBoost;
-                const steer = (keys.a || keys.ArrowLeft) ? -1 : ((keys.d || keys.ArrowRight) ? 1 : 0);
+                
+                // Учитываем a/A и d/D
+                const steer = (keys.a || keys.A || keys.ArrowLeft) ? -1 : ((keys.d || keys.D || keys.ArrowRight) ? 1 : 0);
                 localPlayer.steering += (steer - localPlayer.steering) * 0.2;
                 if (Math.abs(ts) > 0.1) localPlayer.angle += localPlayer.steering * 0.05 * (ts>0?1:-1);
                 
@@ -701,6 +707,9 @@ window.onload = () => {
         localPlayer.nickname = nick;
         localStorage.setItem('pixelRacing_nickname', nick); // Сохраняем имя
         
+        // Сбрасываем клавиши, чтобы машина не поехала сама из-за ввода ника
+        for (let k in keys) keys[k] = false;
+        
         localPlayer.ready = true; localPlayer.isHost = true; gameStarted = true;
         document.getElementById('ui').style.display = 'none';
         document.getElementById('lobby-ui').style.display = 'block';
@@ -733,6 +742,9 @@ window.onload = () => {
     };
 
     window.onkeydown = (e) => {
+        // Если фокус на поле ввода, не обрабатываем игровые клавиши
+        if (document.activeElement.tagName === 'INPUT') return;
+        
         keys[e.key] = true;
         if (e.key === 'Escape' && gameStarted) {
             pauseMenu.style.display = pauseMenu.style.display === 'block' ? 'none' : 'block';
@@ -745,7 +757,9 @@ window.onload = () => {
             }
         }
     };
-    window.onkeyup = (e) => keys[e.key] = false;
+    window.onkeyup = (e) => {
+        keys[e.key] = false;
+    };
     document.getElementById('zoomIn').onclick = () => targetZoom = Math.min(4, targetZoom * 1.5);
     document.getElementById('zoomOut').onclick = () => targetZoom = Math.max(0.1, targetZoom / 1.5);
     requestAnimationFrame(loop);
@@ -772,6 +786,10 @@ socket.on('roomList', (rooms) => {
         item.onclick = () => {
             const nick = document.getElementById('nickname-join').value || 'Guest';
             localStorage.setItem('pixelRacing_nickname', nick); // Сохраняем имя
+            
+            // Сбрасываем клавиши
+            for (let k in keys) keys[k] = false;
+            
             socket.emit('joinRoom', { roomId: room.id, nickname: nick, color: localPlayer.color });
         };
         list.appendChild(item);
@@ -848,4 +866,4 @@ socket.on('roomJoined', (d) => {
     document.getElementById('lobby-ui').style.display = 'block';
     updateLobbyUI();
 });
-socket.on('playerMovement', (p) => { if(players[p.id]) { players[p.id].x = p.x; players[p.id].y = p.y; players[p.id].angle = p.angle; } });
+socket.on('playerMoved', (p) => { if(players[p.id]) { players[p.id].x = p.x; players[p.id].y = p.y; players[p.id].angle = p.angle; } });
