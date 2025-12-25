@@ -72,6 +72,7 @@ function createRoom() {
     const generatedHazards = generateHazardsForTrack(selectedPoints);
 
     localPlayer.nickname = nick;
+    localPlayer.ready = true; // ГАРАНТИРУЕМ ОТРИСОВКУ
     ui.style.display = 'none';
     
     // Показываем игровой интерфейс
@@ -102,6 +103,7 @@ function joinRoom(roomId) {
     localStorage.setItem('pixelRacingNickname', nick);
 
     localPlayer.nickname = nick;
+    localPlayer.ready = true; // ГАРАНТИРУЕМ ОТРИСОВКУ
     ui.style.display = 'none';
     
     // Показываем игровой интерфейс
@@ -326,7 +328,7 @@ let nitroBoost = 0; // Дополнительная скорость от нит
 const ACCEL = 0.055, FRICTION = 0.9975, TURN_SPEED = 0.05, MAX_SPEED = 22.0, OFF_ROAD_SPEED = 5.0;
 
 let localPlayer = {
-    id: null, x: 1500, y: 1000, angle: 0, speed: 0,
+    id: null, x: 2800, y: 1000, angle: 0, speed: 0,
     nickname: '', color: '#ff0000', laps: 0,
     lastPassedFinish: false, ready: false, checkpointHit: false,
     steering: 0, currentLapTime: 0, bestLapTime: Infinity
@@ -559,10 +561,15 @@ socket.on('currentPlayers', (serverPlayers) => { players = serverPlayers; update
 socket.on('playerUpdated', (playerInfo) => { 
     players[playerInfo.id] = playerInfo; 
     if (playerInfo.id === myId) { 
-        if (localPlayer.speed === 0 || gameState === 'LOBBY') {
-            localPlayer.x = playerInfo.x; localPlayer.y = playerInfo.y; localPlayer.angle = playerInfo.angle; 
+        // Если мы только зашли (x=1500) или стоим, обновляем позицию с сервера
+        if (localPlayer.x === 1500 || localPlayer.speed === 0 || gameState === 'LOBBY') {
+            localPlayer.x = playerInfo.x; 
+            localPlayer.y = playerInfo.y; 
+            localPlayer.angle = playerInfo.angle; 
         }
-        localPlayer.laps = playerInfo.laps; localPlayer.ready = true; localPlayer.color = playerInfo.color; 
+        localPlayer.laps = playerInfo.laps; 
+        localPlayer.ready = true; 
+        localPlayer.color = playerInfo.color; 
         if (playerInfo.bestLapTime !== undefined) localPlayer.bestLapTime = playerInfo.bestLapTime;
     } 
     updateColorUI(); 
