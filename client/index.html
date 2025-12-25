@@ -19,7 +19,8 @@
         }
         body {
             color: #fff;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Press Start 2P', cursive; /* Переходим на пиксельный шрифт везде */
+            font-size: 12px;
         }
         #game-container {
             position: fixed;
@@ -27,222 +28,168 @@
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: #1a5e1a;
+            background: #0a200a; /* Более глубокий зеленый */
             z-index: 1;
         }
-        canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-            image-rendering: pixelated;
+        /* Общий стиль для всех панелей HUD */
+        .hud-panel {
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #55ff55;
+            box-shadow: 0 0 15px rgba(85, 255, 85, 0.3);
+            padding: 12px;
+            z-index: 100;
+            display: none;
+            position: absolute;
         }
+
         #audio-controls {
             position: absolute;
             top: 20px;
             right: 20px;
             display: flex;
-            gap: 20px;
-            z-index: 100;
-        }
-        .audio-group {
-            position: relative;
-            padding-bottom: 20px; /* Создаем невидимый мостик между кнопкой и меню */
-        }
-        .audio-dropdown {
-            display: none;
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background: #222;
-            border: 4px solid #fff;
-            padding: 15px;
-            margin-top: -5px; /* Соединяем вплотную с зоной падинга */
-            box-shadow: 10px 10px 0 rgba(0,0,0,0.5);
-            min-width: 220px; /* Увеличили ширину, чтобы ползунок не вылезал */
-            flex-direction: column;
-            gap: 15px;
-        }
-        .audio-dropdown::before {
-            content: '';
-            position: absolute;
-            top: -18px;
-            right: 20px;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
-            border-bottom: 14px solid #fff;
-        }
-        .audio-group:hover .audio-dropdown {
-            display: flex;
-        }
-        .dropdown-item {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            color: #fff;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            font-weight: bold;
-            width: 100%; /* Занимаем всю ширину */
-        }
-        .dropdown-item label {
-            letter-spacing: 1px;
-            color: #aaa;
-        }
-        input[type="range"] {
-            -webkit-appearance: none;
-            width: 100%; /* Теперь точно влезет */
-            box-sizing: border-box;
-            height: 12px;
-            background: #444;
-            border: 2px solid #fff;
-            outline: none;
-            margin: 5px 0;
-        }
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 15px;
-            height: 25px;
-            background: #55ff55;
-            border: 2px solid #fff;
-            cursor: pointer;
-        }
-        .dropdown-item select {
-            background: #000;
-            color: #55ff55;
-            border: 2px solid #fff;
-            padding: 8px;
-            font-family: inherit;
-            font-size: 0.9rem;
-            cursor: pointer;
-            outline: none;
-        }
-        .audio-btn {
-            background: #000;
-            color: #fff;
-            border: 4px solid #fff;
-            padding: 8px 15px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 0.9rem;
-            font-weight: bold;
-            text-transform: uppercase;
-            transition: all 0.1s;
-            box-shadow: 4px 4px 0 #555;
-        }
-        .audio-btn:active {
-            box-shadow: 0 0 0;
-            transform: translate(4px, 4px);
-        }
-        .audio-btn:hover {
-            background: #333;
-            color: #55ff55;
-            border-color: #55ff55;
-        }
-        #speedometer {
-            display: none;
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.7);
-            border: 3px solid #fff;
-            padding: 10px;
-            border-radius: 10px;
-            text-align: center;
-            width: 120px;
-            z-index: 100;
-            flex-direction: column;
-            align-items: center;
-        }
-        #lap-counter {
-            display: none;
-            position: absolute;
-            top: 20px;
-            left: calc(50% - 280px);
-            background: rgba(0, 0, 0, 0.7);
-            border: 3px solid #fff;
-            padding: 10px;
-            border-radius: 10px;
-            text-align: center;
-            width: 140px;
-            z-index: 100;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-        #lap-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #fff;
-        }
-        #lap-timer {
-            display: none;
-            position: absolute;
-            top: 20px;
-            left: calc(50% + 140px);
-            background: rgba(0, 0, 0, 0.7);
-            border: 3px solid #fff;
-            padding: 10px;
-            border-radius: 10px;
-            text-align: left;
-            width: 160px;
-            z-index: 100;
-            flex-direction: column;
-            font-size: 0.9rem;
-            font-weight: bold;
-        }
-        #current-lap {
-            color: #55ff55;
-        }
-        #best-lap {
-            color: #ffff55;
-            font-size: 0.8rem;
-            margin-top: 5px;
-        }
-        #speed-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #55ff55;
-            line-height: 1;
-        }
-        #speed-unit {
-            font-size: 0.8rem;
-            color: #ccc;
-            margin-top: 5px;
-        }
-        #zoom-controls {
-            display: none;
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
             flex-direction: column;
             gap: 10px;
             z-index: 100;
         }
+        .audio-group {
+            position: relative;
+        }
+        .audio-dropdown {
+            display: none;
+            position: absolute;
+            top: 0;
+            right: 110%; /* Раскрываем влево, чтобы не перекрывать */
+            background: rgba(0,0,0,0.95);
+            border: 2px solid #55ff55;
+            padding: 12px;
+            box-shadow: -10px 10px 20px rgba(0,0,0,0.5);
+            min-width: 200px;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .audio-dropdown::before {
+            display: none; /* Убираем треугольник */
+        }
+        .audio-group:hover .audio-dropdown {
+            display: flex;
+        }
+        .audio-btn {
+            background: rgba(0,0,0,0.8);
+            color: #55ff55;
+            border: 2px solid #55ff55;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 8px;
+            text-transform: uppercase;
+            box-shadow: 0 0 10px rgba(85,255,85,0.2);
+            transition: all 0.2s;
+        }
+        .audio-btn:hover {
+            background: #55ff55;
+            color: #000;
+            box-shadow: 0 0 20px rgba(85,255,85,0.5);
+        }
+
+        #speedometer {
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 160px;
+            text-align: center;
+            border-color: #55ff55;
+            border-bottom-width: 5px;
+        }
+        #speed-value {
+            font-size: 2.5rem;
+            color: #55ff55;
+            text-shadow: 0 0 10px rgba(85,255,85,0.5);
+        }
+        #speed-unit {
+            font-size: 0.6rem;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        #nitro-ui {
+            bottom: 240px;
+            left: 20px;
+            width: 220px;
+            border-color: #00ffff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        }
+        .nitro-label {
+            font-size: 12px;
+            color: #00ffff;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        #nitro-container {
+            width: 100%;
+            height: 10px;
+            background: #222;
+            border: 1px solid #555;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        #nitro-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #0088ff, #00ffff);
+            box-shadow: 0 0 15px #00ffff;
+            transition: width 0.15s linear; /* Плавная анимация */
+        }
+        #nitro-bar.low {
+            background: linear-gradient(90deg, #ff8800, #ff0000);
+            box-shadow: 0 0 15px #ff0000;
+        }
+
+        #lap-counter {
+            top: 20px;
+            left: 20px; /* Переместим влево для баланса */
+            width: 180px;
+            border-color: #ffff55;
+            box-shadow: 0 0 15px rgba(255, 255, 85, 0.3);
+        }
+        #lap-value {
+            font-size: 1.2rem;
+            color: #ffff55;
+        }
+
+        #lap-timer {
+            top: 20px;
+            left: calc(50% + 100px); /* Справа от спидометра */
+            width: 240px;
+            border-color: #ff55ff;
+            box-shadow: 0 0 15px rgba(255, 85, 255, 0.3);
+        }
+        #current-lap { color: #55ff55; font-size: 10px; margin-bottom: 5px; }
+        #best-lap { color: #ffff55; font-size: 8px; }
+
+        #zoom-controls {
+            bottom: 20px;
+            right: 20px;
+            flex-direction: column;
+            gap: 10px;
+            display: none;
+            position: absolute;
+            z-index: 100;
+        }
         .zoom-btn {
-            width: 50px;
-            height: 50px;
-            background: #000;
+            width: 45px;
+            height: 45px;
+            background: rgba(0,0,0,0.8);
             color: #fff;
-            border: 4px solid #fff;
-            font-size: 24px;
-            font-weight: bold;
+            border: 2px solid #fff;
+            font-size: 18px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 4px 4px 0 #555;
-            transition: all 0.1s;
+            transition: all 0.2s;
         }
-        .zoom-btn:active {
-            box-shadow: 0 0 0;
-            transform: translate(4px, 4px);
-        }
-        .zoom-btn:hover {
-            background: #333;
-            color: #55ff55;
-            border-color: #55ff55;
-        }
+        .zoom-btn:hover { border-color: #55ff55; color: #55ff55; }
         .lap-selection {
             margin: 15px 0;
             display: flex;
@@ -284,24 +231,24 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.7) url('https://images.unsplash.com/photo-1511447333015-45b65e60f6d5?auto=format&fit=crop&w=1200&q=80');
+            background: rgba(0, 0, 0, 0.9) url('https://images.unsplash.com/photo-1511447333015-45b65e60f6d5?auto=format&fit=crop&w=1200&q=80');
             background-blend-mode: darken;
             background-size: cover;
             background-position: center;
-            padding: 40px;
+            padding: 50px;
             text-align: center;
-            border: 6px solid #fff;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            border: 4px solid #55ff55;
+            box-shadow: 0 0 50px rgba(85,255,85,0.3);
             z-index: 200;
-            min-width: 500px;
+            min-width: 600px;
         }
         .main-title {
             font-family: 'Press Start 2P', cursive;
-            font-size: 3rem;
+            font-size: 3.5rem;
             color: #55ff55;
-            text-shadow: 6px 6px 0px #000;
-            margin-bottom: 40px;
-            line-height: 1.2;
+            text-shadow: 8px 8px 0px #000, 0 0 20px rgba(85,255,85,0.5);
+            margin-bottom: 50px;
+            line-height: 1.4;
         }
         .menu-screen {
             display: none;
@@ -309,29 +256,27 @@
         .menu-screen.active {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 20px;
         }
         .menu-btn {
-            padding: 18px 30px;
-            background: #55ff55;
-            color: #000;
-            border: 4px solid #fff;
+            padding: 20px 30px;
+            background: rgba(0,0,0,0.8);
+            color: #55ff55;
+            border: 2px solid #55ff55;
             cursor: pointer;
             font-family: inherit;
-            font-weight: bold;
-            font-size: 1.3rem;
+            font-size: 10px;
             text-transform: uppercase;
-            box-shadow: 6px 6px 0 #000;
-            transition: all 0.1s;
+            box-shadow: 0 0 10px rgba(85,255,85,0.2);
+            transition: all 0.2s;
         }
         .menu-btn:hover {
-            background: #22cc22;
-            transform: translate(-2px, -2px);
-            box-shadow: 8px 8px 0 #000;
+            background: #55ff55;
+            color: #000;
+            box-shadow: 0 0 20px rgba(85,255,85,0.5);
         }
         .menu-btn:active {
-            transform: translate(4px, 4px);
-            box-shadow: 0 0 0 #000;
+            transform: scale(0.95);
         }
         .room-list {
             max-height: 300px;
@@ -375,37 +320,47 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            padding: 40px;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 50px;
             text-align: center;
-            border: 6px solid #fff;
+            border: 4px solid #ff55ff;
+            box-shadow: 0 0 100px rgba(255, 85, 255, 0.4);
             z-index: 300;
-            box-shadow: 0 0 100px rgba(0,0,0,1);
         }
         .pause-title {
-            font-size: 2.5rem;
-            margin-bottom: 30px;
-            color: #fff;
+            font-size: 3rem;
+            margin-bottom: 40px;
+            color: #ff55ff;
+            text-shadow: 0 0 20px rgba(255, 85, 255, 0.5);
             text-transform: uppercase;
         }
         .pause-btn {
             display: block;
             width: 100%;
-            padding: 15px 30px;
-            margin: 10px 0;
+            padding: 20px 40px;
+            margin: 15px 0;
             font-family: inherit;
-            font-size: 1.2rem;
-            font-weight: bold;
+            font-size: 10px;
             cursor: pointer;
-            border: 4px solid #fff;
+            border: 2px solid #fff;
+            background: rgba(0,0,0,0.8);
+            color: #fff;
             text-transform: uppercase;
-            transition: all 0.1s;
+            transition: all 0.2s;
         }
         #resumeBtn {
+            border-color: #55ff55;
+            color: #55ff55;
+        }
+        #resumeBtn:hover {
             background: #55ff55;
             color: #000;
         }
         #endRaceBtn {
+            border-color: #ff5555;
+            color: #ff5555;
+        }
+        #endRaceBtn:hover {
             background: #ff5555;
             color: #fff;
         }
@@ -485,14 +440,20 @@
                     </div>
                 </div>
             </div>
-        <div id="lap-counter">
+        <div id="lap-counter" class="hud-panel">
             <div id="lap-value">LAP 0/5</div>
         </div>
-        <div id="speedometer">
+        <div id="speedometer" class="hud-panel">
             <div id="speed-value">0</div>
             <div id="speed-unit">KM/H</div>
         </div>
-        <div id="lap-timer">
+        <div id="nitro-ui" class="hud-panel">
+            <div class="nitro-label">NITRO</div>
+            <div id="nitro-container">
+                <div id="nitro-bar"></div>
+            </div>
+        </div>
+        <div id="lap-timer" class="hud-panel">
             <div id="current-lap">LAP: 00:00.00</div>
             <div id="best-lap">BEST: --:--.--</div>
         </div>

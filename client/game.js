@@ -10,7 +10,7 @@ let localPlayer = {
     lastPassedFinish: false, ready: false,
     steering: 0, currentLapTime: 0, bestLapTime: Infinity,
     isHost: false, colorInitialized: false,
-    exhaust: []
+    exhaust: [], nitroCharge: 100, maxNitroCharge: 100
 };
 
 const trackPresets = {
@@ -25,9 +25,15 @@ let players = {}, gameState = 'LOBBY', gameStarted = false, targetLaps = 5;
 let trackPoints = trackPresets.preset1.points, trackHazards = { nitro: [] }, scenery = [], tribunes = [];
 const roadWidth = 450; // Чуть увеличим для солидности
 
+let bullets = [];
+let lastShotTime = 0;
+const SHOT_COOLDOWN = 200; // мс между выстрелами
+
 let zoomLevel = 0.8, targetZoom = 0.8;
 const minZoom = 0.02, maxZoom = 4.0;
 let cameraX = 2800, cameraY = 1000;
+let isDragging = false, lastMouseX = 0, lastMouseY = 0;
+let cameraManualMode = false, manualCameraTimeout = null;
 
 let musicEnabled = true, engineEnabled = true, musicVolume = 0.5, engineVolume = 0.5, currentTrackIdx = Math.floor(Math.random() * 6);
 const tracks = ["audio/01_-nine-thou-superstars-remix.mp3", "audio/02_-do-ya-thang.mp3", "audio/03_-i-am-rock.mp3", "audio/04_-in-a-hood-near-you.mp3", "audio/05_-lets-move.mp3", "audio/07_-fired-up.mp3"];
@@ -144,7 +150,17 @@ function drawCar(p) {
     // Отрисовка выхлопа
     if (!p.exhaust) p.exhaust = [];
     p.exhaust.forEach((part, idx) => {
-        ctx.fillStyle = `rgba(200, 200, 200, ${part.alpha})`;
+        const color = part.color || '#cccccc';
+        if (color.startsWith('#')) {
+            // Превращаем HEX в RGBA
+            const r = parseInt(color.slice(1, 3), 16);
+            const g = parseInt(color.slice(3, 5), 16);
+            const b = parseInt(color.slice(5, 7), 16);
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${part.alpha})`;
+        } else {
+            ctx.fillStyle = color;
+        }
+        
         ctx.beginPath();
         ctx.arc(part.x, part.y, part.size, 0, Math.PI * 2);
         ctx.fill();
@@ -164,7 +180,8 @@ function drawCar(p) {
             vx: (Math.random() - 0.5) * 2,
             vy: (Math.random() - 0.5) * 2,
             alpha: 0.6,
-            size: 5 + Math.random() * 5
+            size: 5 + Math.random() * 5,
+            color: '#cccccc'
         });
     }
 
@@ -192,6 +209,12 @@ function drawCar(p) {
     // Спойлер
     ctx.fillStyle = '#222';
     ctx.fillRect(-55, -25, 10, 50);
+    
+    // Пулемет на крыше
+    ctx.fillStyle = '#333';
+    ctx.fillRect(-10, -5, 40, 10); // ствол
+    ctx.fillStyle = '#111';
+    ctx.fillRect(-15, -10, 20, 20); // основание
     
     ctx.restore();
     
@@ -248,35 +271,50 @@ function drawLeaderboard() {
         return (a.bestLapTime || Infinity) - (b.bestLapTime || Infinity);
     });
 
-    const w = 420, h = 40 + playersArr.length * 30, x = 20, y = 120;
+    const w = 450, h = 50 + playersArr.length * 35, x = 20, y = 100;
     
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    // Фоновая панель в стиле HUD
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#55ff55';
+    ctx.lineWidth = 2;
     ctx.strokeRect(x, y, w, h);
 
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 14px Courier';
+    // Заголовок
+    ctx.fillStyle = '#55ff55';
+    ctx.font = '10px "Press Start 2P"';
     ctx.textAlign = 'left';
-    ctx.fillText('POS PLAYER          LAPS    BEST TIME', x + 15, y + 25);
+    ctx.fillText('POS PLAYER         LAPS  BEST', x + 20, y + 30);
+    
+    // Разделительная линия
+    ctx.strokeStyle = 'rgba(85, 255, 85, 0.3)';
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y + 40);
+    ctx.lineTo(x + w - 10, y + 40);
+    ctx.stroke();
     
     playersArr.forEach((p, idx) => {
-        const py = y + 55 + idx * 30;
+        const py = y + 65 + idx * 35;
         
-        // Цветовой индикатор слева
+        // Полоска текущего игрока
+        if (p.id === socket.id) {
+            ctx.fillStyle = 'rgba(85, 255, 85, 0.15)';
+            ctx.fillRect(x + 2, py - 20, w - 4, 30);
+        }
+
+        // Цветовой индикатор команды/машины
         ctx.fillStyle = p.color;
-        ctx.fillRect(x + 5, py - 18, 4, 24);
+        ctx.fillRect(x + 8, py - 15, 4, 20);
         
         ctx.fillStyle = p.id === socket.id ? '#55ff55' : '#fff';
-        ctx.font = '14px Courier';
+        ctx.font = '9px "Press Start 2P"';
         
-        const pos = (idx + 1).toString().padStart(2, ' ');
-        const nickname = (p.nickname || 'Guest').padEnd(15).substring(0, 15);
-        const laps = (p.laps || 0).toString().padStart(4, ' ');
-        const bestTime = formatTime(p.bestLapTime);
+        const pos = (idx + 1).toString().padStart(2, '0');
+        const nickname = (p.nickname || 'Guest').padEnd(12).substring(0, 12);
+        const laps = (p.laps || 0).toString().padStart(2, ' ');
+        const bestTime = formatTime(p.bestLapTime).replace('--:--.--', '--:--');
         
-        ctx.fillText(`${pos}  ${nickname} ${laps}    ${bestTime}`, x + 15, py);
+        ctx.fillText(`${pos}  ${nickname}  ${laps}   ${bestTime}`, x + 25, py);
     });
 }
 
@@ -296,31 +334,31 @@ function drawPodium() {
     
     const drawPlace = (place, x, h, color, name) => {
         // Пьедестал
-        ctx.fillStyle = '#444';
+        ctx.fillStyle = 'rgba(0,0,0,0.9)';
         ctx.fillRect(x - podiumW/2, bottomY - h, podiumW, h);
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
         ctx.strokeRect(x - podiumW/2, bottomY - h, podiumW, h);
         
         // Место
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 30px Courier';
+        ctx.fillStyle = color;
+        ctx.font = '24px "Press Start 2P"';
         ctx.textAlign = 'center';
         ctx.fillText(place, x, bottomY - h / 2 + 10);
         
         // Машинка победителя
         ctx.save();
-        ctx.translate(x, bottomY - h - 30);
+        ctx.translate(x, bottomY - h - 40);
         ctx.fillStyle = color;
-        ctx.fillRect(-30, -15, 60, 30);
+        ctx.fillRect(-35, -18, 70, 36);
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.fillRect(0, -12, 25, 24);
+        ctx.fillRect(5, -14, 25, 28);
         ctx.restore();
         
         // Имя
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 20px Courier';
-        ctx.fillText(name, x, bottomY - h - 60);
+        ctx.font = '10px "Press Start 2P"';
+        ctx.fillText(name, x, bottomY - h - 80);
     };
     
     // 2-е место
@@ -395,7 +433,48 @@ function loop() {
                 if (keys.w || keys.W || keys.ArrowUp) localPlayer.speed += ACCEL; 
                 else if (keys.s || keys.S || keys.ArrowDown) localPlayer.speed -= ACCEL;
                 
-                localPlayer.speed *= FRICTION; nitroBoost *= 0.96;
+                localPlayer.speed *= FRICTION; 
+                nitroBoost *= 0.96;
+
+                // Логика НИТРО (Shift)
+                if ((keys.Shift || keys.shift) && localPlayer.nitroCharge > 0 && Math.abs(localPlayer.speed) > 1) {
+                    nitroBoost += 0.4;
+                    localPlayer.nitroCharge -= 0.8;
+                    if (localPlayer.nitroCharge < 0) localPlayer.nitroCharge = 0;
+                    
+                    // Эффект огня из выхлопной трубы при нитро
+                    for (let i = 0; i < 2; i++) {
+                        localPlayer.exhaust.push({
+                            x: localPlayer.x - Math.cos(localPlayer.angle) * 45,
+                            y: localPlayer.y - Math.sin(localPlayer.angle) * 45,
+                            vx: (Math.random() - 0.5) * 2 - Math.cos(localPlayer.angle) * 5,
+                            vy: (Math.random() - 0.5) * 2 - Math.sin(localPlayer.angle) * 5,
+                            life: 20,
+                            size: 8 + Math.random() * 8,
+                            color: Math.random() > 0.5 ? '#00ffff' : '#ffffff'
+                        });
+                    }
+                } else {
+                    // Восстановление нитро (100 ед за 10 сек -> 10 ед в сек -> 10/60 за кадр ≈ 0.16)
+                    if (localPlayer.nitroCharge < localPlayer.maxNitroCharge) {
+                        localPlayer.nitroCharge += 0.16;
+                        if (localPlayer.nitroCharge > localPlayer.maxNitroCharge) 
+                            localPlayer.nitroCharge = localPlayer.maxNitroCharge;
+                    }
+                }
+
+                // Обновление полоски нитро
+                const nb = document.getElementById('nitro-bar');
+                if (nb) {
+                    nb.style.width = `${(localPlayer.nitroCharge / localPlayer.maxNitroCharge) * 100}%`;
+                    // Добавляем эффект "критического уровня", если заряда меньше 25%
+                    if (localPlayer.nitroCharge < 25) {
+                        nb.classList.add('low');
+                    } else {
+                        nb.classList.remove('low');
+                    }
+                }
+
                 const ts = localPlayer.speed + nitroBoost;
                 
                 // Учитываем a/A и d/D
@@ -406,11 +485,33 @@ function loop() {
                 const curMax = isOff ? OFF_S : MAX_S;
                 if (localPlayer.speed > curMax) localPlayer.speed = curMax;
                 
+                // Если игрок поехал, возвращаем камеру к нему
+                if (Math.abs(localPlayer.speed) > 0.5) {
+                    cameraManualMode = false;
+                }
+
                 localPlayer.x += Math.cos(localPlayer.angle) * ts;
                 localPlayer.y += Math.sin(localPlayer.angle) * ts;
                 
                 if (!isF(localPlayer.x)) localPlayer.x = 2800;
                 if (!isF(localPlayer.y)) localPlayer.y = 1000;
+
+                // Стрельба
+                if ((keys[' '] || keys.Space) && Date.now() - lastShotTime > SHOT_COOLDOWN) {
+                    const bx = localPlayer.x + Math.cos(localPlayer.angle) * 40;
+                    const by = localPlayer.y + Math.sin(localPlayer.angle) * 40;
+                    const bullet = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        ownerId: socket.id,
+                        x: bx, y: by,
+                        vx: Math.cos(localPlayer.angle) * 35,
+                        vy: Math.sin(localPlayer.angle) * 35,
+                        life: 60
+                    };
+                    bullets.push(bullet);
+                    socket.emit('playerShoot', bullet);
+                    lastShotTime = Date.now();
+                }
 
                 socket.emit('playerMovement', { x: localPlayer.x, y: localPlayer.y, angle: localPlayer.angle });
                 const sv = document.getElementById('speed-value'); if (sv) sv.textContent = Math.floor(Math.abs(ts)*10);
@@ -462,7 +563,11 @@ function loop() {
         zoomLevel += (targetZoom - zoomLevel) * 0.1;
         ctx.save(); ctx.translate(canvas.width/2, canvas.height/2); ctx.scale(zoomLevel, zoomLevel);
         
-        cameraX += (localPlayer.x - cameraX) * 0.1; cameraY += (localPlayer.y - cameraY) * 0.1;
+        if (!cameraManualMode) {
+            cameraX += (localPlayer.x - cameraX) * 0.1; 
+            cameraY += (localPlayer.y - cameraY) * 0.1;
+        }
+        
         if (!isF(cameraX)) cameraX = 2800; if (!isF(cameraY)) cameraY = 1000;
         ctx.translate(-cameraX, -cameraY);
 
@@ -475,6 +580,58 @@ function loop() {
         if (gameStarted) {
             drawCar(localPlayer);
         }
+
+        // Обновление и отрисовка пуль
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            const b = bullets[i];
+            b.x += b.vx;
+            b.y += b.vy;
+            b.life--;
+
+            if (b.life <= 0) {
+                bullets.splice(i, 1);
+                continue;
+            }
+
+            // Отрисовка пули
+            ctx.fillStyle = '#ff0';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Проверка попадания (только для своих пуль)
+            if (b.ownerId === socket.id) {
+                Object.values(players).forEach(p => {
+                    if (p.id !== socket.id) {
+                        const dist = Math.sqrt(Math.pow(b.x - p.x, 2) + Math.pow(b.y - p.y, 2));
+                        if (dist < 40) {
+                            socket.emit('playerHit', { targetId: p.id, bulletId: b.id });
+                            bullets.splice(i, 1);
+                            createHitEffect(p.x, p.y);
+                        }
+                    }
+                });
+            }
+        }
+
+        // Обновление и отрисовка частиц попадания
+        for (let i = hitParticles.length - 1; i >= 0; i--) {
+            const p = hitParticles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+            if (p.life <= 0) {
+                hitParticles.splice(i, 1);
+                continue;
+            }
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = p.life / 30;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+
         ctx.restore();
 
         // Отрисовываем затемнение и миникарту только если игра начата
@@ -491,12 +648,22 @@ function loop() {
 }
 
 function drawMinimap() {
-    const ms = 200, p = 20, x = p, y = canvas.height - ms - p;
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    const ms = 220, p = 20, x = p, y = canvas.height - ms - p;
+    
+    // Фон миникарты
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.fillRect(x, y, ms, ms);
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#55ff55';
+    ctx.lineWidth = 2;
     ctx.strokeRect(x, y, ms, ms);
+
+    // Сетка (декоративный элемент)
+    ctx.strokeStyle = 'rgba(85, 255, 85, 0.1)';
+    ctx.lineWidth = 1;
+    for(let i=1; i<4; i++) {
+        ctx.beginPath(); ctx.moveTo(x + i*ms/4, y); ctx.lineTo(x + i*ms/4, y + ms); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, y + i*ms/4); ctx.lineTo(x + ms, y + i*ms/4); ctx.stroke();
+    }
 
     const xs = trackPoints.map(pt => pt.x), ys = trackPoints.map(pt => pt.y);
     const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -767,7 +934,7 @@ window.onload = () => {
         document.getElementById('ui').style.display = 'none';
         document.getElementById('lobby-ui').style.display = 'block';
         
-        ['speedometer', 'lap-counter', 'lap-timer', 'zoom-controls'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'flex'; });
+        ['speedometer', 'lap-counter', 'lap-timer', 'zoom-controls', 'nitro-ui'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'flex'; });
         const tt = document.getElementById('trackSelect').value; trackPoints = trackPresets[tt].points;
         generateScenery();
         socket.emit('createRoom', { nickname: localPlayer.nickname, color: localPlayer.color, laps: document.getElementById('lapCount').value, trackType: tt, trackData: { points: trackPoints, hazards: { nitro: [] } } });
@@ -798,6 +965,8 @@ window.onload = () => {
         // Если фокус на поле ввода, не обрабатываем игровые клавиши
         if (document.activeElement.tagName === 'INPUT') return;
         
+        if (e.key === ' ') e.preventDefault(); // Предотвращаем скролл при стрельбе
+        
         keys[e.key] = true;
         if (e.key === 'Escape' && gameStarted) {
             pauseMenu.style.display = pauseMenu.style.display === 'block' ? 'none' : 'block';
@@ -815,6 +984,52 @@ window.onload = () => {
     };
     document.getElementById('zoomIn').onclick = () => targetZoom = Math.min(4, targetZoom * 1.5);
     document.getElementById('zoomOut').onclick = () => targetZoom = Math.max(0.1, targetZoom / 1.5);
+
+    window.addEventListener('wheel', (e) => {
+        if (!gameStarted) return;
+        if (e.ctrlKey) { // Обычно тачпад передает ctrlKey при пинче
+            e.preventDefault();
+            const delta = -e.deltaY * 0.01;
+            targetZoom = Math.min(4, Math.max(0.1, targetZoom * (1 + delta)));
+        } else {
+            if (e.deltaY < 0) {
+                targetZoom = Math.min(4, targetZoom * 1.1);
+            } else {
+                targetZoom = Math.max(0.1, targetZoom / 1.1);
+            }
+        }
+    }, { passive: false });
+
+    window.addEventListener('mousedown', (e) => {
+        if (!gameStarted) return;
+        if (e.button === 0) { // Левая кнопка мыши
+            isDragging = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            cameraManualMode = true;
+            if (manualCameraTimeout) clearTimeout(manualCameraTimeout);
+        }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+            const dx = (e.clientX - lastMouseX) / zoomLevel;
+            const dy = (e.clientY - lastMouseY) / zoomLevel;
+            cameraX -= dx;
+            cameraY -= dy;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        isDragging = false;
+        // Возвращаем камеру к игроку через 3 секунды после окончания перетаскивания
+        if (manualCameraTimeout) clearTimeout(manualCameraTimeout);
+        manualCameraTimeout = setTimeout(() => {
+            cameraManualMode = false;
+        }, 3000);
+    });
     requestAnimationFrame(loop);
 };
 
@@ -920,6 +1135,46 @@ socket.on('roomJoined', (d) => {
     const lv = document.getElementById('lap-value'); if (lv) lv.textContent = `LAP 0/${targetLaps}`;
     document.getElementById('ui').style.display = 'none';
     document.getElementById('lobby-ui').style.display = 'block';
+    
+    ['speedometer', 'lap-counter', 'lap-timer', 'zoom-controls', 'nitro-ui'].forEach(id => { 
+        const el = document.getElementById(id); 
+        if (el) el.style.display = 'flex'; 
+    });
+    
     updateLobbyUI();
 });
 socket.on('playerMoved', (p) => { if(players[p.id]) { players[p.id].x = p.x; players[p.id].y = p.y; players[p.id].angle = p.angle; } });
+
+socket.on('bulletFired', (bullet) => {
+    if (bullet.ownerId !== socket.id) {
+        bullets.push(bullet);
+    }
+});
+
+socket.on('bulletHit', (data) => {
+    const { targetId, bulletId } = data;
+    // Удаляем пулю у всех клиентов
+    bullets = bullets.filter(b => b.id !== bulletId);
+    
+    const targetPlayer = (targetId === socket.id) ? localPlayer : players[targetId];
+    if (targetPlayer) {
+        createHitEffect(targetPlayer.x, targetPlayer.y);
+        if (targetId === socket.id) {
+            localPlayer.speed *= 0.5; // Замедляем игрока при попадании
+            // Визуальный эффект тряски или вспышки можно добавить тут
+        }
+    }
+});
+
+let hitParticles = [];
+function createHitEffect(x, y) {
+    for (let i = 0; i < 15; i++) {
+        hitParticles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 10,
+            vy: (Math.random() - 0.5) * 10,
+            life: 30,
+            color: '#ff4500'
+        });
+    }
+}

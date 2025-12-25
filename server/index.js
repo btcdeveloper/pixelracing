@@ -137,6 +137,20 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('playerShoot', (bullet) => {
+        const result = findSocketPlayer(socket.id);
+        if (result) {
+            socket.to(result.room.id).emit('bulletFired', bullet);
+        }
+    });
+
+    socket.on('playerHit', (data) => {
+        const result = findSocketPlayer(socket.id);
+        if (result) {
+            io.to(result.room.id).emit('bulletHit', data);
+        }
+    });
+
     socket.on('sendEmoji', (emoji) => {
         const result = findSocketPlayer(socket.id);
         if (result) {
