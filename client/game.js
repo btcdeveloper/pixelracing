@@ -26,6 +26,15 @@ const bestLapEl = document.getElementById('best-lap');
 const lapValueEl = document.getElementById('lap-value');
 const lapCountSelect = document.getElementById('lapCount');
 const trackSelect = document.getElementById('trackSelect');
+const pauseMenu = document.getElementById('pause-menu');
+const resumeBtn = document.getElementById('resumeBtn');
+const endRaceBtn = document.getElementById('endRaceBtn');
+
+// Загрузка сохраненного никнейма
+const savedNickname = localStorage.getItem('pixelRacingNickname');
+if (savedNickname && nicknameInput) {
+    nicknameInput.value = savedNickname;
+}
 
 // Контролы аудио
 const musicVolumeSlider = document.getElementById('musicVolume');
@@ -362,9 +371,25 @@ generateScenery();
 const keys = {ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, w:false, s:false, a:false, d:false, Enter:false};
 window.addEventListener('keydown', (e) => { 
     if (keys.hasOwnProperty(e.key)) keys[e.key] = true; 
+    
+    // Переключение меню ESC
+    if (e.key === 'Escape' && gameStarted) {
+        const isVisible = pauseMenu.style.display === 'block';
+        pauseMenu.style.display = isVisible ? 'none' : 'block';
+    }
+
     if (emojiMap[e.key] && gameStarted) {
         socket.emit('sendEmoji', emojiMap[e.key]);
     }
+});
+
+resumeBtn.addEventListener('click', () => {
+    pauseMenu.style.display = 'none';
+});
+
+endRaceBtn.addEventListener('click', () => {
+    socket.emit('forceReset');
+    pauseMenu.style.display = 'none';
 });
 window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
 
@@ -394,6 +419,10 @@ carOptions.forEach(opt => {
 function joinGame() {
     initAudio();
     const nick = nicknameInput.value.trim() || 'Guest' + Math.floor(Math.random() * 1000);
+    
+    // Сохранение никнейма в браузер
+    localStorage.setItem('pixelRacingNickname', nick);
+
     const laps = lapCountSelect.value;
     const trackType = trackSelect.value;
     
@@ -467,6 +496,10 @@ socket.on('gameStateUpdate', (state, winners) => {
     }
 
     if (state === 'LOBBY') { 
+        gameStarted = false;
+        ui.style.display = 'block';
+        if (pauseMenu) pauseMenu.style.display = 'none';
+        localPlayer.ready = false;
         localPlayer.laps = 0; localPlayer.speed = 0; fireworks = []; wheelParticles = [];
         localPlayer.currentLapTime = 0; localPlayer.bestLapTime = Infinity;
         if (currentLapEl) currentLapEl.textContent = `LAP: 00:00.00`;

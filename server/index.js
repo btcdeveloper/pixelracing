@@ -164,6 +164,27 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('forceReset', () => {
+        gameState = 'LOBBY';
+        winners = [];
+        const readyOnes = Object.values(players).filter(p => p.ready);
+        const trackPoints = currentTrack.points || currentTrack;
+        const startX = trackPoints ? trackPoints[0].x - 200 : 2800;
+        const startY = trackPoints ? trackPoints[0].y : 1000;
+
+        readyOnes.forEach((p, idx) => {
+            p.laps = 0;
+            p.bestLapTime = null;
+            p.finished = false;
+            p.x = startX;
+            p.y = startY + (idx * 70);
+            p.angle = 0;
+            p.ready = false; // Сбрасываем готовность при принудительном выходе
+        });
+        io.emit('gameStateUpdate', gameState);
+        io.emit('currentPlayers', players);
+    });
+
     socket.on('disconnect', () => {
         delete players[socket.id];
         io.emit('playerDisconnected', socket.id);

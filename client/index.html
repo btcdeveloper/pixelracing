@@ -287,6 +287,51 @@
             padding: 20px;
             text-align: center;
             border: 4px solid #fff;
+            z-index: 200;
+        }
+        #pause-menu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            text-align: center;
+            border: 6px solid #fff;
+            z-index: 300;
+            box-shadow: 0 0 100px rgba(0,0,0,1);
+        }
+        .pause-title {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            color: #fff;
+            text-transform: uppercase;
+        }
+        .pause-btn {
+            display: block;
+            width: 100%;
+            padding: 15px 30px;
+            margin: 10px 0;
+            font-family: inherit;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: 4px solid #fff;
+            text-transform: uppercase;
+            transition: all 0.1s;
+        }
+        #resumeBtn {
+            background: #55ff55;
+            color: #000;
+        }
+        #endRaceBtn {
+            background: #ff5555;
+            color: #fff;
+        }
+        .pause-btn:hover {
+            transform: scale(1.05);
+            filter: brightness(1.2);
         }
         input {
             padding: 10px;
@@ -404,6 +449,11 @@
                 </select>
             </div>
             <button id="startBtn">START RACE</button>
+        </div>
+        <div id="pause-menu">
+            <h2 class="pause-title">PAUSE</h2>
+            <button id="resumeBtn" class="pause-btn">RESUME</button>
+            <button id="endRaceBtn" class="pause-btn">END RACE</button>
         </div>
         <audio id="bgMusicElement" loop crossorigin="anonymous"></audio>
     </div>
