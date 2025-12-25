@@ -561,6 +561,15 @@ window.onload = () => {
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     generateScenery(); 
     
+    // Загрузка сохраненного никнейма
+    const savedNickname = localStorage.getItem('pixelRacing_nickname');
+    if (savedNickname) {
+        const nick1 = document.getElementById('nickname');
+        const nick2 = document.getElementById('nickname-join');
+        if (nick1) nick1.value = savedNickname;
+        if (nick2) nick2.value = savedNickname;
+    }
+    
     // --- АУДИО ЛОГИКА ---
     // ... existing audio logic ...
     const bgMusic = document.getElementById('bgMusicElement');
@@ -688,7 +697,10 @@ window.onload = () => {
     });
 
     document.getElementById('startBtn').onclick = () => {
-        localPlayer.nickname = document.getElementById('nickname').value || 'Player';
+        const nick = document.getElementById('nickname').value || 'Player';
+        localPlayer.nickname = nick;
+        localStorage.setItem('pixelRacing_nickname', nick); // Сохраняем имя
+        
         localPlayer.ready = true; localPlayer.isHost = true; gameStarted = true;
         document.getElementById('ui').style.display = 'none';
         document.getElementById('lobby-ui').style.display = 'block';
@@ -759,6 +771,7 @@ socket.on('roomList', (rooms) => {
         `;
         item.onclick = () => {
             const nick = document.getElementById('nickname-join').value || 'Guest';
+            localStorage.setItem('pixelRacing_nickname', nick); // Сохраняем имя
             socket.emit('joinRoom', { roomId: room.id, nickname: nick, color: localPlayer.color });
         };
         list.appendChild(item);
