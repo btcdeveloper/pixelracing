@@ -179,10 +179,10 @@ let localPlayer = {
 };
 
 function formatTime(ms) {
-    if (ms === Infinity) return "--:--.--";
-    const totalSeconds = ms / 1000;
+    if (ms === null || ms === undefined || ms === Infinity) return "--:--.--";
+    const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
-    const seconds = Math.floor(totalSeconds % 60);
+    const seconds = totalSeconds % 60;
     const hundredths = Math.floor((ms % 1000) / 10);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${hundredths.toString().padStart(2, '0')}`;
 }
@@ -460,6 +460,11 @@ socket.on('gameStateUpdate', (state, winners) => {
     gameState = state; 
     if (winners) winnersList = winners; 
     if (gameStarted && musicEnabled) playMusic(); 
+    
+    if (state === 'RACING') {
+        localPlayer.currentLapTime = 0; // Сбрасываем время при старте гонки
+    }
+
     if (state === 'LOBBY') { 
         localPlayer.laps = 0; localPlayer.speed = 0; fireworks = []; wheelParticles = [];
         localPlayer.currentLapTime = 0; localPlayer.bestLapTime = Infinity;
@@ -608,7 +613,7 @@ function update() {
     const onFinishLine = Math.abs(localPlayer.x - fx) < 100 && Math.abs(localPlayer.y - fy) < roadWidth/2;
     if (onFinishLine && !localPlayer.lastPassedFinish && totalSpeed > 0 && localPlayer.checkpointHit) {
         // Обработка времени круга
-        if (localPlayer.currentLapTime < localPlayer.bestLapTime) {
+        if (localPlayer.bestLapTime === null || localPlayer.bestLapTime === Infinity || localPlayer.currentLapTime < localPlayer.bestLapTime) {
             localPlayer.bestLapTime = localPlayer.currentLapTime;
             if (bestLapEl) bestLapEl.textContent = `BEST: ${formatTime(localPlayer.bestLapTime)}`;
         }

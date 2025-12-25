@@ -28,7 +28,7 @@ io.on('connection', (socket) => {
         nickname: 'Guest',
         color: '#' + Math.floor(Math.random()*16777215).toString(16),
         laps: 0,
-        bestLapTime: Infinity,
+        bestLapTime: null,
         finished: false,
         ready: false
     };
@@ -109,7 +109,7 @@ io.on('connection', (socket) => {
     socket.on('lapCompleted', (data) => {
         if (players[socket.id] && gameState === 'RACING' && !players[socket.id].finished) {
             players[socket.id].laps++;
-            if (data && data.bestLapTime) {
+            if (data && data.bestLapTime !== undefined && data.bestLapTime !== null) {
                 players[socket.id].bestLapTime = data.bestLapTime;
             }
             io.emit('playerUpdated', players[socket.id]);
@@ -144,7 +144,7 @@ io.on('connection', (socket) => {
 
             readyOnes.forEach((p, idx) => {
                 p.laps = 0;
-                p.bestLapTime = Infinity;
+                p.bestLapTime = null;
                 p.finished = false;
                 p.x = startX;
                 p.y = startY + (idx * 70);
