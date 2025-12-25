@@ -544,6 +544,14 @@
             <button id="resumeBtn" class="pause-btn">RESUME</button>
             <button id="endRaceBtn" class="pause-btn">END RACE</button>
         </div>
+        <div id="lobby-ui" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 30px; border: 4px solid #fff; text-align: center; z-index: 150; min-width: 300px;">
+            <h2 style="margin-bottom: 20px; color: #55ff55;">WAITING FOR PLAYERS</h2>
+            <div id="lobby-player-list" style="margin-bottom: 30px; display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                <!-- Список игроков будет тут -->
+            </div>
+            <button id="forceStartBtn" class="menu-btn" style="width: 100%; display: none;">START RACE NOW!</button>
+            <p id="not-host-msg" style="color: #aaa; font-style: italic; display: none;">Waiting for host to start...</p>
+        </div>
         <audio id="bgMusicElement" loop crossorigin="anonymous"></audio>
     </div>
     <script src="/socket.io/socket.io.js"></script>

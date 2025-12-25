@@ -73,6 +73,7 @@ function createRoom() {
 
     localPlayer.nickname = nick;
     localPlayer.ready = true; // ГАРАНТИРУЕМ ОТРИСОВКУ
+    localPlayer.roomId = socket.id; // ПРИ СОЗДАНИИ ROOM ID = НАШ ID
     ui.style.display = 'none';
     
     // Показываем игровой интерфейс
@@ -104,6 +105,7 @@ function joinRoom(roomId) {
 
     localPlayer.nickname = nick;
     localPlayer.ready = true; // ГАРАНТИРУЕМ ОТРИСОВКУ
+    localPlayer.roomId = roomId; // ЗАПОМИНАЕМ ID КОМНАТЫ
     ui.style.display = 'none';
     
     // Показываем игровой интерфейс
@@ -152,7 +154,9 @@ socket.on('roomJoined', (data) => {
     trackPoints = data.trackData.points || data.trackData;
     trackHazards = data.trackData.hazards || { nitro: [] };
     targetLaps = data.targetLaps;
+    localPlayer.roomId = data.roomId; // Обновляем ID комнаты
     generateScenery();
+    updateLobbyUI();
 });
 
 carOptions.forEach(opt => { 
@@ -182,6 +186,10 @@ const trackSelect = document.getElementById('trackSelect');
 const pauseMenu = document.getElementById('pause-menu');
 const resumeBtn = document.getElementById('resumeBtn');
 const endRaceBtn = document.getElementById('endRaceBtn');
+const lobbyUi = document.getElementById('lobby-ui');
+const lobbyPlayerList = document.getElementById('lobby-player-list');
+const forceStartBtn = document.getElementById('forceStartBtn');
+const notHostMsg = document.getElementById('not-host-msg');
 
 // Контролы аудио
 const musicVolumeSlider = document.getElementById('musicVolume');
@@ -556,8 +564,44 @@ const forceStartAudio = () => {
 };
 window.addEventListener('mousedown', forceStartAudio);
 
+function updateLobbyUI() {
+    if (!gameStarted || gameState !== 'LOBBY') {
+        lobbyUi.style.display = 'none';
+        return;
+    }
+
+    lobbyUi.style.display = 'block';
+    lobbyPlayerList.innerHTML = '';
+    
+    const playerArray = Object.values(players);
+    playerArray.forEach(p => {
+        const div = document.createElement('div');
+        div.style.padding = '10px';
+        div.style.background = 'rgba(255,255,255,0.1)';
+        div.style.borderLeft = `5px solid ${p.color}`;
+        div.innerHTML = `<strong>${p.nickname}</strong> ${p.id === socket.id ? '(You)' : ''}`;
+        lobbyPlayerList.appendChild(div);
+    });
+
+    // Хост — это тот, чей ID совпадает с ID комнаты
+    // Поскольку при создании комнаты мы записываем socket.id в localPlayer.roomId
+    const isHost = (localPlayer.roomId === socket.id);
+    
+    if (isHost) {
+        forceStartBtn.style.display = 'block';
+        notHostMsg.style.display = 'none';
+    } else {
+        forceStartBtn.style.display = 'none';
+        notHostMsg.style.display = 'block';
+    }
+}
+
+forceStartBtn.addEventListener('click', () => {
+    socket.emit('startGame');
+});
+
 socket.on('connect', () => { myId = socket.id; localPlayer.id = myId; });
-socket.on('currentPlayers', (serverPlayers) => { players = serverPlayers; updateColorUI(); });
+socket.on('currentPlayers', (serverPlayers) => { players = serverPlayers; updateColorUI(); updateLobbyUI(); });
 socket.on('playerUpdated', (playerInfo) => { 
     players[playerInfo.id] = playerInfo; 
     if (playerInfo.id === myId) { 
@@ -570,9 +614,11 @@ socket.on('playerUpdated', (playerInfo) => {
         localPlayer.laps = playerInfo.laps; 
         localPlayer.ready = true; 
         localPlayer.color = playerInfo.color; 
+        localPlayer.roomId = playerInfo.roomId; // Сохраняем ID комнаты
         if (playerInfo.bestLapTime !== undefined) localPlayer.bestLapTime = playerInfo.bestLapTime;
     } 
     updateColorUI(); 
+    updateLobbyUI();
 });
 socket.on('playerMoved', (playerInfo) => { if (players[playerInfo.id]) { players[playerInfo.id].x = playerInfo.x; players[playerInfo.id].y = playerInfo.y; players[playerInfo.id].angle = playerInfo.angle; } });
 socket.on('updateTargetLaps', (laps) => { targetLaps = laps; if (lapCountSelect) lapCountSelect.value = laps; });
@@ -610,6 +656,7 @@ socket.on('gameStateUpdate', (state, winners) => {
         if (bestLapEl) bestLapEl.textContent = `BEST: --:--.--`;
         const rBtn = document.getElementById('resetBtn'); if (rBtn) rBtn.remove(); 
     } 
+    updateLobbyUI();
 });
 
 socket.on('backToMainMenu', () => {
@@ -629,6 +676,7 @@ socket.on('backToMainMenu', () => {
     // Сбрасываем игрока
     localPlayer.ready = false;
     players = {};
+    updateLobbyUI();
 });
 socket.on('playerDisconnected', (id) => { delete players[id]; updateColorUI(); });
 
@@ -655,13 +703,9 @@ function update() {
     if (!gameStarted) return;
     
     if (gameState === 'LOBBY') {
-        const isHost = (socket.id === myId); // Мы и есть хозяин, если создали комнату
-        // Проверяем все варианты клавиши "вверх"
         const upPressed = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц || keys.Enter || keys[' '];
-        
-        if (upPressed) {
-            socket.emit('startGame');
-        }
+        // Убираем автостарт по клавише, оставляем только кнопку
+        // if (upPressed) socket.emit('startGame');
         updateEngineSound(0); return;
     }
     if (gameState === 'FINISHED') { updateEngineSound(0); updateFireworks(); return; }
@@ -1043,9 +1087,9 @@ function render() {
             ctx.font = '24px Courier New';
             if (myId === myId) { // Временно упростим, сервер сам разберется
                  ctx.fillStyle = '#55ff55';
-                 ctx.fillText('YOU ARE THE HOST', canvas.width/2, canvas.height/2);
+                 ctx.fillText('WAITING FOR PLAYERS...', canvas.width/2, canvas.height/2);
                  ctx.fillStyle = '#fff';
-                 ctx.fillText('PRESS "W" OR "UP" TO START RACE', canvas.width/2, canvas.height/2 + 50);
+                 ctx.fillText('CLICK THE START BUTTON TO BEGIN', canvas.width/2, canvas.height/2 + 50);
             }
             
             ctx.font = '16px Courier New'; ctx.fillStyle = '#aaa';
