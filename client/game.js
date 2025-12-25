@@ -584,15 +584,15 @@ function updateLobbyUI() {
             lobbyPlayerList.appendChild(div);
         });
 
-        const isHost = (localPlayer.roomId === myId);
-        
-        if (isHost) {
-            forceStartBtn.style.display = 'block';
-            notHostMsg.style.display = 'none';
-        } else {
-            forceStartBtn.style.display = 'none';
-            notHostMsg.style.display = 'block';
-        }
+    const isHost = (localPlayer.roomId === socket.id);
+    
+    if (isHost) {
+        forceStartBtn.style.display = 'block';
+        notHostMsg.style.display = 'none';
+    } else {
+        forceStartBtn.style.display = 'none';
+        notHostMsg.style.display = 'block';
+    }
     }
 }
 
@@ -604,9 +604,9 @@ socket.on('connect', () => { myId = socket.id; localPlayer.id = myId; });
 socket.on('currentPlayers', (serverPlayers) => { players = serverPlayers; updateColorUI(); updateLobbyUI(); });
 socket.on('playerUpdated', (playerInfo) => { 
     players[playerInfo.id] = playerInfo; 
-    if (playerInfo.id === myId) { 
-        // Если мы только зашли (x=1500) или стоим, обновляем позицию с сервера
-        if (localPlayer.x === 1500 || localPlayer.speed === 0 || gameState === 'LOBBY') {
+    if (playerInfo.id === socket.id) { 
+        // Если мы только зашли (x=2800) или стоим, обновляем позицию с сервера
+        if (localPlayer.x === 2800 || localPlayer.speed === 0 || gameState === 'LOBBY') {
             localPlayer.x = playerInfo.x; 
             localPlayer.y = playerInfo.y; 
             localPlayer.angle = playerInfo.angle; 
@@ -707,11 +707,11 @@ function update() {
     if (!gameStarted) return;
     
     if (gameState === 'LOBBY') {
-        const upPressed = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц || keys.Enter || keys[' '];
+        const moveUp = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц || keys.Enter || keys[' '];
+        const isHost = (localPlayer.roomId === socket.id);
         
-        // Разрешаем хосту стартовать и по клавише, и по кнопке
-        const isHost = (localPlayer.roomId === myId);
-        if (upPressed && isHost) {
+        if (moveUp && isHost) {
+            console.log("Host is starting the race...");
             socket.emit('startGame');
         }
         updateEngineSound(0); return;
@@ -1092,13 +1092,13 @@ function render() {
             ctx.fillStyle = '#fff'; ctx.font = 'bold 40px Courier New'; ctx.textAlign = 'center';
             ctx.fillText('GRAND PRIX LOBBY', canvas.width/2, canvas.height/2 - 50);
             
-            const isHost = (localPlayer.roomId === myId);
+            const isHost = (localPlayer.roomId === socket.id);
             ctx.font = '24px Courier New';
             if (isHost) {
                  ctx.fillStyle = '#55ff55';
                  ctx.fillText('YOU ARE THE HOST', canvas.width/2, canvas.height/2);
                  ctx.fillStyle = '#fff';
-                 ctx.fillText('PRESS "W" OR CLICK BUTTON TO START', canvas.width/2, canvas.height/2 + 50);
+                 ctx.fillText('PRESS "W" OR START BUTTON', canvas.width/2, canvas.height/2 + 50);
             } else {
                  ctx.fillStyle = '#aaa';
                  ctx.fillText('WAITING FOR HOST TO START...', canvas.width/2, canvas.height/2);
