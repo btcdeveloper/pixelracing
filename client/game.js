@@ -1065,8 +1065,8 @@ function render() {
         }
 
         // Плавная интерполяция зума (0.1 - коэффициент мягкости)
-        if (isNaN(zoomLevel)) zoomLevel = 1.0;
         zoomLevel += (targetZoom - zoomLevel) * 0.1;
+        if (isNaN(zoomLevel) || zoomLevel <= 0) zoomLevel = 1.0;
 
         ctx.save();
         
@@ -1105,13 +1105,12 @@ function render() {
             ctx.fillStyle = '#fff'; ctx.font = 'bold 40px Courier New'; ctx.textAlign = 'center';
             ctx.fillText('GRAND PRIX LOBBY', canvas.width/2, canvas.height/2 - 50);
             
-            const isHost = (localPlayer.roomId === socket.id);
             ctx.font = '24px Courier New';
-            if (isHost) {
+            if (localPlayer.isHost) {
                  ctx.fillStyle = '#55ff55';
                  ctx.fillText('YOU ARE THE HOST', canvas.width/2, canvas.height/2);
                  ctx.fillStyle = '#fff';
-                 ctx.fillText('PRESS "W" OR START BUTTON', canvas.width/2, canvas.height/2 + 50);
+                 ctx.fillText('PRESS "W" OR CLICK BUTTON TO START', canvas.width/2, canvas.height/2 + 50);
             } else {
                  ctx.fillStyle = '#aaa';
                  ctx.fillText('WAITING FOR HOST TO START...', canvas.width/2, canvas.height/2);
