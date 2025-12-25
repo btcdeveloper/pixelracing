@@ -126,7 +126,8 @@ let localPlayer = {
     x: -500, y: -500, angle: 0, speed: 0,
     nickname: '', color: '#ff0000', laps: 0,
     lastPassedFinish: false,
-    ready: false
+    ready: false,
+    checkpointHit: false // НОВЫЙ ЧЕКПОИНТ
 };
 
 const trackPoints = [
@@ -197,9 +198,7 @@ socket.on('playerMoved', (playerInfo) => {
 socket.on('playerUpdated', (playerInfo) => {
     players[playerInfo.id] = playerInfo;
     if (playerInfo.id === myId) {
-        localPlayer.x = playerInfo.x;
-        localPlayer.y = playerInfo.y;
-        localPlayer.angle = playerInfo.angle;
+        // УБИРАЕМ ОБНОВЛЕНИЕ X, Y, ANGLE ДЛЯ СЕБЯ (чтобы не было дерганья)
         localPlayer.laps = playerInfo.laps;
         localPlayer.ready = playerInfo.ready;
         localPlayer.color = playerInfo.color;
@@ -355,12 +354,19 @@ function update() {
         else speedValueEl.style.color = '#55ff55';
     }
 
+    // ЛОГИКА ЧЕКПОИНТА (Точка на середине трассы - trackPoints[7] {x: 800, y: 700})
+    const distToCheckpoint = Math.sqrt(Math.pow(localPlayer.x - 800, 2) + Math.pow(localPlayer.y - 700, 2));
+    if (distToCheckpoint < 100) {
+        localPlayer.checkpointHit = true;
+    }
+
     const onFinishLine = localPlayer.x > 340 && localPlayer.x < 360 && 
                          localPlayer.y > 140 && localPlayer.y < 260;
     
-    if (onFinishLine && !localPlayer.lastPassedFinish && localPlayer.speed > 0) {
+    if (onFinishLine && !localPlayer.lastPassedFinish && localPlayer.speed > 0 && localPlayer.checkpointHit) {
         socket.emit('lapCompleted');
         localPlayer.lastPassedFinish = true;
+        localPlayer.checkpointHit = false; // Сбрасываем для следующего круга
     } else if (!onFinishLine) {
         localPlayer.lastPassedFinish = false;
     }
