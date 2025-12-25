@@ -269,19 +269,91 @@ function checkOffRoad(x, y) {
 }
 
 const scenery = [];
+const tribunes = [];
+let lastCheerTime = 0;
+
 function generateScenery() {
     scenery.length = 0; // Очищаем старые деревья
+    tribunes.length = 0;
+
+    // Генерируем трибуны вдоль трассы
+    for (let i = 0; i < trackPoints.length - 1; i++) {
+        const p1 = trackPoints[i];
+        const p2 = trackPoints[i+1];
+        const dist = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+        
+        // Ставим трибуну на каждом 3-м сегменте для разнообразия
+        if (i % 3 === 0 && dist > 1500) {
+            const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2;
+            
+            // Смещение от центра дороги (на обочину)
+            const offX = Math.cos(angle + Math.PI/2) * (roadWidth/2 + 100);
+            const offY = Math.sin(angle + Math.PI/2) * (roadWidth/2 + 100);
+            
+            tribunes.push({ 
+                x: midX + offX, 
+                y: midY + offY, 
+                angle: angle,
+                fans: Array.from({length: 30}, () => ({
+                    offset: Math.random() * 200,
+                    color: `hsl(${Math.random()*360}, 70%, 50%)`,
+                    jumpOffset: Math.random() * Math.PI
+                }))
+            });
+        }
+    }
+
     for (let i = 0; i < 1200; i++) {
         let x = Math.random() * 18000 - 3000;
         let y = Math.random() * 14000 - 3000;
         if (checkOffRoad(x, y)) {
-            scenery.push({ 
-                x, y, size: 40 + Math.random() * 80, 
-                type: Math.random() > 0.4 ? 'tree' : 'bush',
-                color: `hsl(${100 + Math.random() * 40}, ${40 + Math.random() * 30}%, ${20 + Math.random() * 20}%)`
-            });
+            // Проверка, чтобы деревья не попадали на трибуны
+            const nearTribune = tribunes.some(t => Math.sqrt(Math.pow(x - t.x, 2) + Math.pow(y - t.y, 2)) < 300);
+            if (!nearTribune) {
+                scenery.push({ 
+                    x, y, size: 40 + Math.random() * 80, 
+                    type: Math.random() > 0.4 ? 'tree' : 'bush',
+                    color: `hsl(${100 + Math.random() * 40}, ${40 + Math.random() * 30}%, ${20 + Math.random() * 20}%)`
+                });
+            }
         }
     }
+}
+
+function playCheer() {
+    if (!engineEnabled || audioCtx.state === 'suspended') return;
+    const now = Date.now();
+    if (now - lastCheerTime < 3000) return; // Не частим
+    lastCheerTime = now;
+
+    const duration = 2.0;
+    const bufferSize = audioCtx.sampleRate * duration;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i/bufferSize);
+    }
+    
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 800;
+    filter.Q.value = 1.5;
+    
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.1 * engineVolume, audioCtx.currentTime + 0.2);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    noise.start();
 }
 generateScenery();
 
@@ -507,6 +579,12 @@ function update() {
 
     updateEngineSound(totalSpeed);
     
+    // Проверка близости к трибунам для звука
+    tribunes.forEach(t => {
+        const d = Math.sqrt(Math.pow(localPlayer.x - t.x, 2) + Math.pow(localPlayer.y - t.y, 2));
+        if (d < 600) playCheer();
+    });
+    
     if (speedValueEl) {
         const displaySpeed = Math.floor(Math.abs(totalSpeed) * 10.0);
         speedValueEl.textContent = displaySpeed;
@@ -640,21 +718,30 @@ function drawTrack() {
 }
 
 function drawCrowd() {
-    // Рисуем небольшие трибуны на финишной прямой
-    ctx.fillStyle = '#444';
-    ctx.fillRect(2500, 700, 1000, 50); // Трибуна сверху
-    ctx.fillRect(2500, 1250, 1000, 50); // Трибуна снизу
-    
-    // Зрители (маленькие точки)
-    for (let i = 0; i < 50; i++) {
-        ctx.fillStyle = `hsl(${Math.random()*360}, 70%, 50%)`;
-        ctx.beginPath();
-        ctx.arc(2500 + i*20, 720 + Math.sin(Date.now()*0.01 + i)*5, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(2500 + i*20, 1270 + Math.cos(Date.now()*0.01 + i)*5, 8, 0, Math.PI * 2);
-        ctx.fill();
-    }
+    tribunes.forEach(t => {
+        ctx.save();
+        ctx.translate(t.x, t.y);
+        ctx.rotate(t.angle);
+        
+        // Сама конструкция трибуны
+        ctx.fillStyle = '#444';
+        ctx.fillRect(-300, -25, 600, 50);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-300, -25, 600, 50);
+        
+        // Зрители
+        t.fans.forEach((fan, idx) => {
+            ctx.fillStyle = fan.color;
+            ctx.beginPath();
+            // Зрители прыгают от радости
+            const jump = Math.sin(Date.now()*0.01 + fan.jumpOffset) * 5;
+            ctx.arc(-280 + (idx * 20), jump, 8, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        
+        ctx.restore();
+    });
 }
 
 function drawHazards() {
