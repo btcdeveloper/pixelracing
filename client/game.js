@@ -181,12 +181,6 @@ const pauseMenu = document.getElementById('pause-menu');
 const resumeBtn = document.getElementById('resumeBtn');
 const endRaceBtn = document.getElementById('endRaceBtn');
 
-// Загрузка сохраненного никнейма
-const savedNickname = localStorage.getItem('pixelRacingNickname');
-if (savedNickname && nicknameInput) {
-    nicknameInput.value = savedNickname;
-}
-
 // Контролы аудио
 const musicVolumeSlider = document.getElementById('musicVolume');
 const musicTrackSelect = document.getElementById('musicTrack');
@@ -554,62 +548,6 @@ const forceStartAudio = () => {
     window.removeEventListener('mousedown', forceStartAudio);
 };
 window.addEventListener('mousedown', forceStartAudio);
-
-startBtn.addEventListener('click', joinGame);
-nicknameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') joinGame(); });
-
-carOptions.forEach(opt => { 
-    opt.addEventListener('click', () => { 
-        carOptions.forEach(o => {
-            o.style.borderColor = '#555';
-            o.style.boxShadow = 'none';
-        });
-        opt.style.borderColor = '#55ff55';
-        opt.style.boxShadow = '0 0 10px #55ff55';
-        localPlayer.color = opt.dataset.color; 
-        // Сразу уведомляем сервер о выборе цвета, чтобы забронировать его
-        socket.emit('selectColor', localPlayer.color);
-    }); 
-});
-
-function joinGame() {
-    initAudio();
-    const nick = nicknameInput.value.trim() || 'Guest' + Math.floor(Math.random() * 1000);
-    
-    // Сохранение никнейма в браузер
-    localStorage.setItem('pixelRacingNickname', nick);
-
-    const laps = lapCountSelect.value;
-    const trackType = trackSelect.value;
-    
-    // Получаем данные из пресета
-    const selectedPreset = trackPresets[trackType] || trackPresets.preset1;
-    const selectedPoints = selectedPreset.points;
-    const generatedHazards = generateHazardsForTrack(selectedPoints);
-
-    localPlayer.nickname = nick;
-    localPlayer.ready = true;
-    ui.style.display = 'none';
-    gameStarted = true;
-    
-    // Отправляем полные данные на сервер
-    socket.emit('joinGame', { 
-        nickname: nick, 
-        color: localPlayer.color, 
-        laps: laps,
-        trackData: {
-            points: selectedPoints,
-            hazards: generatedHazards
-        }
-    });
-    
-    // Сразу применяем локально
-    trackPoints = selectedPoints;
-    trackHazards = generatedHazards;
-    generateScenery();
-    
-    playMusic(true);
-}
 
 socket.on('connect', () => { myId = socket.id; localPlayer.id = myId; });
 socket.on('currentPlayers', (serverPlayers) => { players = serverPlayers; updateColorUI(); });
