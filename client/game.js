@@ -77,7 +77,8 @@ function createRoom() {
     const generatedHazards = generateHazardsForTrack(selectedPoints);
 
     localPlayer.nickname = nick;
-    localPlayer.ready = true; // ГАРАНТИРУЕМ ОТРИСОВКУ
+    localPlayer.ready = true; 
+    localPlayer.isHost = true; // СТАВИМ СРАЗУ
     ui.style.display = 'none';
     
     // Показываем игровой интерфейс
@@ -157,7 +158,8 @@ socket.on('roomJoined', (data) => {
     trackPoints = data.trackData.points || data.trackData;
     trackHazards = data.trackData.hazards || { nitro: [] };
     targetLaps = data.targetLaps;
-    localPlayer.roomId = data.roomId; // Обновляем ID комнаты
+    localPlayer.roomId = data.roomId;
+    localPlayer.isHost = data.isHost; // СОХРАНЯЕМ СТАТУС
     generateScenery();
     updateLobbyUI();
 });
@@ -1047,39 +1049,39 @@ function render() {
             return;
         }
 
-        // Плавная интерполяция зума (0.1 - коэффициент мягкости)
+        // Плавная интерполяция зума
         zoomLevel += (targetZoom - zoomLevel) * 0.1;
-        if (isNaN(zoomLevel) || zoomLevel <= 0) zoomLevel = 1.0;
+        if (isNaN(zoomLevel) || !isFinite(zoomLevel) || zoomLevel <= 0) zoomLevel = 1.0;
 
         ctx.save();
         
-        // Центрируем камеру
         ctx.translate(canvas.width/2, canvas.height/2);
         ctx.scale(zoomLevel, zoomLevel);
         
-        // Плавное следование камеры за игроком (интерполяция позиции)
         const targetCamX = localPlayer.x + cameraOffsetX;
         const targetCamY = localPlayer.y + cameraOffsetY;
         
-        // Защита от NaN при ресайзе
-        if (isNaN(cameraX)) cameraX = targetCamX;
-        if (isNaN(cameraY)) cameraY = targetCamY;
+        // Жесткая защита от NaN и Infinity
+        if (isNaN(cameraX) || !isFinite(cameraX)) cameraX = isFinite(targetCamX) ? targetCamX : 2800;
+        if (isNaN(cameraY) || !isFinite(cameraY)) cameraY = isFinite(targetCamY) ? targetCamY : 1000;
 
-        // Коэффициент 0.25 убирает дерганья, успевая за быстрым болидом
         cameraX += (targetCamX - cameraX) * 0.25;
         cameraY += (targetCamY - cameraY) * 0.25;
         
+        // Финальная проверка перед отрисовкой
+        if (isNaN(cameraX) || !isFinite(cameraX)) cameraX = 2800;
+        if (isNaN(cameraY) || !isFinite(cameraY)) cameraY = 1000;
+
         ctx.translate(-cameraX, -cameraY);
         
         drawTrack();
         drawHazards();
         drawParticles();
         
-        Object.keys(players).forEach(id => { if (id !== myId) drawCar(players[id]); });
+        Object.keys(players).forEach(id => { if (id !== socket.id) drawCar(players[id]); });
         if (gameStarted && localPlayer.ready) drawCar(localPlayer);
         
         drawEmojis(); 
-        
         if (gameState === 'FINISHED') drawFireworks();
         ctx.restore();
 
@@ -1089,12 +1091,7 @@ function render() {
             ctx.fillText('GRAND PRIX LOBBY', canvas.width/2, canvas.height/2 - 50);
             
             ctx.font = '24px Courier New';
-            
-            // ПРОВЕРКА ЧЕРЕЗ players[socket.id] САМАЯ НАДЕЖНАЯ
-            const me = players[socket.id] || localPlayer;
-            const amIHost = me.isHost;
-
-            if (amIHost) {
+            if (localPlayer.isHost) {
                  ctx.fillStyle = '#55ff55';
                  ctx.fillText('YOU ARE THE HOST', canvas.width/2, canvas.height/2);
                  ctx.fillStyle = '#fff';
@@ -1103,9 +1100,6 @@ function render() {
                  ctx.fillStyle = '#aaa';
                  ctx.fillText('WAITING FOR HOST TO START...', canvas.width/2, canvas.height/2);
             }
-            
-            ctx.font = '16px Courier New'; ctx.fillStyle = '#888';
-            ctx.fillText('USE MOUSE WHEEL TO ZOOM', canvas.width/2, canvas.height/2 + 100);
         } else if (gameState === 'FINISHED') {
             ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
             drawPodium();
@@ -1116,14 +1110,9 @@ function render() {
             drawLeaderboard();
         }
 
-        requestAnimationFrame(() => { 
-            try {
-                update(); 
-                render(); 
-            } catch (loopErr) {
-                console.error("Main loop crash prevented:", loopErr);
-                requestAnimationFrame(render); // Пытаемся продолжить отрисовку
-            }
+        requestAnimationFrame(() => {
+            update();
+            render();
         });
     } catch (err) {
         console.error("Render error:", err);

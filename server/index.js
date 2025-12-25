@@ -116,7 +116,8 @@ io.on('connection', (socket) => {
             roomId: roomId,
             gameState: room.gameState,
             targetLaps: room.targetLaps,
-            trackData: room.trackData
+            trackData: room.trackData,
+            isHost: (room.hostId === socket.id)
         });
 
         io.to(roomId).emit('currentPlayers', room.players);
