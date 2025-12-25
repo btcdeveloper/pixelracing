@@ -18,6 +18,141 @@ const ui = document.getElementById('ui');
 const nicknameInput = document.getElementById('nickname');
 const startBtn = document.getElementById('startBtn');
 const carOptions = document.querySelectorAll('.car-option');
+const mainMenu = document.getElementById('main-menu');
+const createMenu = document.getElementById('create-menu');
+const joinMenu = document.getElementById('join-menu');
+const roomListEl = document.getElementById('room-list');
+const nicknameInputJoin = document.getElementById('nickname-join');
+const showCreateBtn = document.getElementById('showCreateBtn');
+const showJoinBtn = document.getElementById('showJoinBtn');
+const backBtns = document.querySelectorAll('.back-btn');
+
+// Загрузка сохраненного никнейма
+const savedNickname = localStorage.getItem('pixelRacingNickname');
+if (savedNickname) {
+    if (nicknameInput) nicknameInput.value = savedNickname;
+    if (nicknameInputJoin) nicknameInputJoin.value = savedNickname;
+}
+
+// Переключение экранов
+if (showCreateBtn) {
+    showCreateBtn.addEventListener('click', () => {
+        mainMenu.classList.remove('active');
+        createMenu.classList.add('active');
+    });
+}
+
+if (showJoinBtn) {
+    showJoinBtn.addEventListener('click', () => {
+        mainMenu.classList.remove('active');
+        joinMenu.classList.add('active');
+        socket.emit('getRooms');
+    });
+}
+
+backBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        createMenu.classList.remove('active');
+        joinMenu.classList.remove('active');
+        mainMenu.classList.add('active');
+    });
+});
+
+function createRoom() {
+    initAudio();
+    const nick = nicknameInput.value.trim() || 'Guest' + Math.floor(Math.random() * 1000);
+    localStorage.setItem('pixelRacingNickname', nick);
+    
+    const laps = lapCountSelect.value;
+    const trackType = trackSelect.value;
+    const selectedPreset = trackPresets[trackType] || trackPresets.preset1;
+    const selectedPoints = selectedPreset.points;
+    const generatedHazards = generateHazardsForTrack(selectedPoints);
+
+    localPlayer.nickname = nick;
+    ui.style.display = 'none';
+    gameStarted = true;
+
+    socket.emit('createRoom', {
+        nickname: nick,
+        color: localPlayer.color,
+        laps: laps,
+        trackType: trackType,
+        trackData: { points: selectedPoints, hazards: generatedHazards }
+    });
+    
+    trackPoints = selectedPoints;
+    trackHazards = generatedHazards;
+    generateScenery();
+    playMusic(true);
+}
+
+function joinRoom(roomId) {
+    initAudio();
+    const nick = nicknameInputJoin.value.trim() || 'Guest' + Math.floor(Math.random() * 1000);
+    localStorage.setItem('pixelRacingNickname', nick);
+
+    localPlayer.nickname = nick;
+    ui.style.display = 'none';
+    gameStarted = true;
+
+    socket.emit('joinRoom', {
+        roomId: roomId,
+        nickname: nick,
+        color: localPlayer.color
+    });
+    playMusic(true);
+}
+
+if (startBtn) {
+    startBtn.addEventListener('click', createRoom);
+}
+
+socket.on('roomList', (rooms) => {
+    if (!roomListEl) return;
+    roomListEl.innerHTML = '';
+    if (rooms.length === 0) {
+        roomListEl.innerHTML = '<div style="padding: 20px; color: #aaa;">No active races found...</div>';
+        return;
+    }
+    rooms.forEach(room => {
+        const item = document.createElement('div');
+        item.className = 'room-item';
+        item.innerHTML = `
+            <div class="room-info">
+                <strong>${room.creator}'s Race</strong><br>
+                <small>${room.trackName}</small>
+            </div>
+            <div class="room-players">${room.playerCount} Players</div>
+        `;
+        item.onclick = () => joinRoom(room.id);
+        roomListEl.appendChild(item);
+    });
+});
+
+socket.on('roomJoined', (data) => {
+    trackPoints = data.trackData.points || data.trackData;
+    trackHazards = data.trackData.hazards || { nitro: [] };
+    targetLaps = data.targetLaps;
+    generateScenery();
+});
+
+carOptions.forEach(opt => { 
+    opt.addEventListener('click', () => { 
+        carOptions.forEach(o => {
+            o.style.borderColor = '#555';
+            o.style.boxShadow = 'none';
+        });
+        const sameColorOpts = document.querySelectorAll(`.car-option[data-color="${opt.dataset.color}"]`);
+        sameColorOpts.forEach(o => {
+            o.style.borderColor = '#55ff55';
+            o.style.boxShadow = '0 0 10px #55ff55';
+        });
+        localPlayer.color = opt.dataset.color; 
+        socket.emit('selectColor', localPlayer.color);
+    }); 
+});
+
 const toggleMusicBtn = document.getElementById('toggleMusic');
 const toggleEngineBtn = document.getElementById('toggleEngine');
 const speedValueEl = document.getElementById('speed-value');
@@ -369,6 +504,7 @@ generateScenery();
 
 // --- ИГРОВОЙ ЦИКЛ ---
 const keys = {ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, w:false, s:false, a:false, d:false, Enter:false};
+// --- УДАЛИТЬ СТАРЫЙ БЛОК ГДЕ-ТО НА 372 СТРОКЕ И ЗАМЕНИТЬ НА ЭТОТ ---
 window.addEventListener('keydown', (e) => { 
     if (keys.hasOwnProperty(e.key)) keys[e.key] = true; 
     
@@ -376,6 +512,11 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && gameStarted) {
         const isVisible = pauseMenu.style.display === 'block';
         pauseMenu.style.display = isVisible ? 'none' : 'block';
+    }
+
+    // Энтер для создания гонки, если мы в меню создания
+    if (e.key === 'Enter' && !gameStarted) {
+        if (createMenu && createMenu.classList.contains('active')) createRoom();
     }
 
     if (emojiMap[e.key] && gameStarted) {
@@ -530,7 +671,10 @@ function updateColorUI() {
 
 function update() {
     if (!gameStarted) return;
+    
     if (gameState === 'LOBBY') {
+        // Только создатель комнаты может запустить гонку нажатием W или Enter
+        // Мы проверяем это косвенно: если id комнаты совпадает с id сокета
         if (keys.Enter || keys.w || keys.ArrowUp) socket.emit('startGame');
         updateEngineSound(0); return;
     }

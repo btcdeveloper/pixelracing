@@ -11,185 +11,214 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, '../client')));
 
-const players = {};
-let gameState = 'LOBBY';
-let winners = [];
-let targetLaps = 5; 
-let currentTrack = {
-    points: [{x: 3000, y: 1000}, {x: 7000, y: 1000}, {x: 8500, y: 2500}, {x: 10000, y: 1000}, {x: 12000, y: 3000}, {x: 10500, y: 4500}, {x: 13000, y: 6000}, {x: 11000, y: 8000}, {x: 8000, y: 6500}, {x: 7000, y: 9000}, {x: 5000, y: 7000}, {x: 3000, y: 9500}, {x: 1500, y: 7500}, {x: 2500, y: 5000}, {x: 800, y: 4500}, {x: 800, y: 1000}, {x: 3000, y: 1000}],
-    hazards: { nitro: [] } // Оставляем только нитро
-}; 
+// Хранилище комнат
+const rooms = {};
+
+// Базовые треки (имена для отображения в списке комнат)
+const trackNames = {
+    preset1: "Grand Prix",
+    preset2: "Speedway (Oval)",
+    preset3: "Hairpin City",
+    preset4: "Zigzag Mountains",
+    preset5: "The Loop"
+};
+
+function getRoomList() {
+    return Object.keys(rooms).map(id => ({
+        id: id,
+        creator: rooms[id].creatorName,
+        trackName: trackNames[rooms[id].trackType] || "Custom",
+        playerCount: Object.keys(rooms[id].players).length,
+        gameState: rooms[id].gameState
+    })).filter(r => r.gameState === 'LOBBY'); // Показываем только те, что еще в лобби
+}
+
+function findSocketPlayer(socketId) {
+    for (const roomId in rooms) {
+        if (rooms[roomId].players[socketId]) {
+            return { room: rooms[roomId], player: rooms[roomId].players[socketId] };
+        }
+    }
+    return null;
+}
 
 io.on('connection', (socket) => {
-    players[socket.id] = {
-        id: socket.id,
-        x: -500, y: -500,
-        angle: 0,
-        nickname: 'Guest',
-        color: '#' + Math.floor(Math.random()*16777215).toString(16),
-        laps: 0,
-        bestLapTime: null,
-        finished: false,
-        ready: false
-    };
+    console.log('New connection:', socket.id);
+    
+    // При подключении отправляем список комнат
+    socket.emit('roomList', getRoomList());
 
-    socket.emit('currentPlayers', players);
-    socket.emit('gameStateUpdate', gameState);
-    socket.emit('updateTargetLaps', targetLaps);
-    if (currentTrack) socket.emit('updateTrack', currentTrack);
+    socket.on('createRoom', (data) => {
+        const roomId = socket.id; // ID комнаты совпадает с ID создателя
+        rooms[roomId] = {
+            id: roomId,
+            creatorName: data.nickname || 'Guest',
+            trackType: data.trackType,
+            targetLaps: parseInt(data.laps) || 5,
+            trackData: data.trackData,
+            gameState: 'LOBBY',
+            winners: [],
+            players: {}
+        };
+        
+        socket.join(roomId);
+        joinRoomLogic(socket, roomId, data);
+        io.emit('roomList', getRoomList());
+    });
 
-    socket.on('selectColor', (color) => {
-        if (players[socket.id]) {
-            players[socket.id].color = color;
-            // Уведомляем всех, что цвет забронирован, даже если игрок еще не нажал Start
-            io.emit('playerUpdated', players[socket.id]);
+    socket.on('joinRoom', (data) => {
+        const roomId = data.roomId;
+        if (rooms[roomId] && rooms[roomId].gameState === 'LOBBY') {
+            socket.join(roomId);
+            joinRoomLogic(socket, roomId, data);
+            io.emit('roomList', getRoomList());
         }
     });
 
-    socket.on('joinGame', (data) => {
-        if (players[socket.id]) {
-            if (data.laps) {
-                targetLaps = parseInt(data.laps);
-                io.emit('updateTargetLaps', targetLaps);
-            }
-            
-            // Трассу устанавливает только первый игрок или если она еще не выбрана
-            const readyPlayersBefore = Object.values(players).filter(p => p.ready);
-            const incomingTrackData = data.trackData;
-            if (incomingTrackData && (readyPlayersBefore.length === 0 || gameState === 'LOBBY')) {
-                currentTrack = incomingTrackData;
-                io.emit('updateTrack', currentTrack);
-            }
+    function joinRoomLogic(socket, roomId, data) {
+        const room = rooms[roomId];
+        room.players[socket.id] = {
+            id: socket.id,
+            roomId: roomId,
+            x: -500, y: -500,
+            angle: 0,
+            nickname: data.nickname || 'Guest',
+            color: data.color || '#ff0000',
+            laps: 0,
+            bestLapTime: null,
+            finished: false,
+            ready: true 
+        };
 
-            const colorToUse = data.color || players[socket.id].color;
-            const isTakenByOther = Object.values(players).some(p => p.id !== socket.id && p.color === colorToUse);
-            
-            if (isTakenByOther) {
-                // Если цвет все-таки заняли, пока мы нажимали кнопку - даем новый рандом
-                players[socket.id].color = '#' + Math.floor(Math.random()*16777215).toString(16);
-            } else {
-                players[socket.id].color = colorToUse;
-            }
+        const readyPlayers = Object.values(room.players);
+        const myIndex = readyPlayers.findIndex(p => p.id === socket.id);
+        
+        const trackPoints = room.trackData.points || room.trackData;
+        const startX = trackPoints ? trackPoints[0].x - 200 : 2800;
+        const startY = trackPoints ? trackPoints[0].y : 1000;
 
-            players[socket.id].nickname = data.nickname || 'Guest';
-            players[socket.id].ready = true;
-            
-            const readyPlayers = Object.values(players).filter(p => p.ready);
-            const myIndex = readyPlayers.findIndex(p => p.id === socket.id);
-            
-            const trackPoints = currentTrack.points || currentTrack;
-            const startX = trackPoints ? trackPoints[0].x - 200 : 2800;
-            const startY = trackPoints ? trackPoints[0].y : 1000;
+        room.players[socket.id].x = startX;
+        room.players[socket.id].y = startY + (myIndex * 70);
+        
+        socket.emit('roomJoined', {
+            roomId: roomId,
+            gameState: room.gameState,
+            targetLaps: room.targetLaps,
+            trackData: room.trackData
+        });
 
-            players[socket.id].x = startX; 
-            players[socket.id].y = startY + (myIndex * 70);
-            players[socket.id].angle = 0;
-            
-            io.emit('playerUpdated', players[socket.id]);
-            const takenColors = Object.values(players).filter(p => p.ready).map(p => p.color);
-            io.emit('updateOccupiedColors', takenColors);
-        }
-    });
+        io.to(roomId).emit('currentPlayers', room.players);
+        io.to(roomId).emit('gameStateUpdate', room.gameState);
+    }
 
     socket.on('playerMovement', (movementData) => {
-        if (players[socket.id] && players[socket.id].ready && gameState === 'RACING') {
-            players[socket.id].x = movementData.x;
-            players[socket.id].y = movementData.y;
-            players[socket.id].angle = movementData.angle;
-            socket.broadcast.emit('playerMoved', players[socket.id]);
+        const result = findSocketPlayer(socket.id);
+        if (result) {
+            const { room, player } = result;
+            if (player.ready && room.gameState === 'RACING') {
+                player.x = movementData.x;
+                player.y = movementData.y;
+                player.angle = movementData.angle;
+                socket.to(room.id).emit('playerMoved', player);
+            }
         }
     });
 
     socket.on('sendEmoji', (emoji) => {
-        if (players[socket.id]) {
-            io.emit('emojiReceived', { id: socket.id, emoji: emoji });
+        const result = findSocketPlayer(socket.id);
+        if (result) {
+            io.to(result.room.id).emit('emojiReceived', { id: socket.id, emoji: emoji });
         }
     });
 
     socket.on('lapCompleted', (data) => {
-        if (players[socket.id] && gameState === 'RACING' && !players[socket.id].finished) {
-            players[socket.id].laps++;
-            if (data && data.bestLapTime !== undefined && data.bestLapTime !== null) {
-                players[socket.id].bestLapTime = data.bestLapTime;
-            }
-            io.emit('playerUpdated', players[socket.id]);
+        const result = findSocketPlayer(socket.id);
+        if (result) {
+            const { room, player } = result;
+            if (room.gameState === 'RACING' && !player.finished) {
+                player.laps++;
+                if (data && data.bestLapTime !== undefined && data.bestLapTime !== null) {
+                    player.bestLapTime = data.bestLapTime;
+                }
+                io.to(room.id).emit('playerUpdated', player);
 
-            if (players[socket.id].laps >= targetLaps) {
-                players[socket.id].finished = true;
-                winners.push({
-                    nickname: players[socket.id].nickname,
-                    color: players[socket.id].color
-                });
-                io.emit('playerFinished', { id: socket.id, nickname: players[socket.id].nickname, rank: winners.length });
+                if (player.laps >= room.targetLaps) {
+                    player.finished = true;
+                    room.winners.push({
+                        nickname: player.nickname,
+                        color: player.color
+                    });
+                    io.to(room.id).emit('playerFinished', { id: socket.id, nickname: player.nickname, rank: room.winners.length });
 
-                const totalReady = Object.values(players).filter(p => p.ready).length;
-                if (winners.length === totalReady || winners.length >= 3) {
-                    gameState = 'FINISHED';
-                    io.emit('gameStateUpdate', gameState, winners);
+                    const totalPlayers = Object.values(room.players).length;
+                    if (room.winners.length === totalPlayers || room.winners.length >= 3) {
+                        room.gameState = 'FINISHED';
+                        io.to(room.id).emit('gameStateUpdate', room.gameState, room.winners);
+                    }
                 }
             }
         }
     });
 
-    socket.on('resetGame', () => {
-        if (gameState === 'FINISHED') {
-            gameState = 'LOBBY';
-            winners = [];
-            // При сбросе игры в лобби, трасса тоже может быть перевыбрана
-            const readyOnes = Object.values(players).filter(p => p.ready);
-            
-            const trackPoints = currentTrack.points || currentTrack;
+    socket.on('selectColor', (color) => {
+        const result = findSocketPlayer(socket.id);
+        if (result) {
+            result.player.color = color;
+            io.to(result.room.id).emit('playerUpdated', result.player);
+        }
+    });
+
+    socket.on('startGame', () => {
+        const result = findSocketPlayer(socket.id);
+        if (result && result.room.id === socket.id) { 
+            const room = result.room;
+            if (room.gameState === 'LOBBY') {
+                room.gameState = 'RACING';
+                room.winners = [];
+                io.to(room.id).emit('gameStateUpdate', room.gameState);
+                io.emit('roomList', getRoomList());
+            }
+        }
+    });
+
+    socket.on('forceReset', () => {
+        const result = findSocketPlayer(socket.id);
+        if (result && result.room.id === socket.id) {
+            const room = result.room;
+            room.gameState = 'LOBBY';
+            room.winners = [];
+            const trackPoints = room.trackData.points || room.trackData;
             const startX = trackPoints ? trackPoints[0].x - 200 : 2800;
             const startY = trackPoints ? trackPoints[0].y : 1000;
 
-            readyOnes.forEach((p, idx) => {
+            Object.values(room.players).forEach((p, idx) => {
                 p.laps = 0;
                 p.bestLapTime = null;
                 p.finished = false;
                 p.x = startX;
                 p.y = startY + (idx * 70);
                 p.angle = 0;
+                p.ready = false; 
             });
-            io.emit('gameStateUpdate', gameState);
-            io.emit('currentPlayers', players);
-            io.emit('updateTargetLaps', targetLaps);
+            io.to(room.id).emit('gameStateUpdate', room.gameState);
+            io.to(room.id).emit('currentPlayers', room.players);
+            io.emit('roomList', getRoomList());
         }
-    });
-
-    socket.on('startGame', () => {
-        if (gameState === 'LOBBY') {
-            gameState = 'RACING';
-            winners = [];
-            io.emit('gameStateUpdate', gameState);
-        }
-    });
-
-    socket.on('forceReset', () => {
-        gameState = 'LOBBY';
-        winners = [];
-        const readyOnes = Object.values(players).filter(p => p.ready);
-        const trackPoints = currentTrack.points || currentTrack;
-        const startX = trackPoints ? trackPoints[0].x - 200 : 2800;
-        const startY = trackPoints ? trackPoints[0].y : 1000;
-
-        readyOnes.forEach((p, idx) => {
-            p.laps = 0;
-            p.bestLapTime = null;
-            p.finished = false;
-            p.x = startX;
-            p.y = startY + (idx * 70);
-            p.angle = 0;
-            p.ready = false; // Сбрасываем готовность при принудительном выходе
-        });
-        io.emit('gameStateUpdate', gameState);
-        io.emit('currentPlayers', players);
     });
 
     socket.on('disconnect', () => {
-        delete players[socket.id];
-        io.emit('playerDisconnected', socket.id);
-        const takenColors = Object.values(players).filter(p => p.ready).map(p => p.color);
-        io.emit('updateOccupiedColors', takenColors);
+        const result = findSocketPlayer(socket.id);
+        if (result) {
+            const { room } = result;
+            delete room.players[socket.id];
+            
+            if (Object.keys(room.players).length === 0) {
+                delete rooms[room.id];
+            } else {
+                io.to(room.id).emit('playerDisconnected', socket.id);
+            }
+            io.emit('roomList', getRoomList());
+        }
     });
 });
 
