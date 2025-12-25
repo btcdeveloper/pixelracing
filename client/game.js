@@ -604,7 +604,15 @@ forceStartBtn.addEventListener('click', () => {
 });
 
 socket.on('connect', () => { myId = socket.id; localPlayer.id = myId; });
-socket.on('currentPlayers', (serverPlayers) => { players = serverPlayers; updateColorUI(); updateLobbyUI(); });
+socket.on('currentPlayers', (serverPlayers) => { 
+    players = serverPlayers; 
+    // Синхронизируем статус хоста для локального игрока
+    if (players[socket.id]) {
+        localPlayer.isHost = players[socket.id].isHost;
+    }
+    updateColorUI(); 
+    updateLobbyUI(); 
+});
 socket.on('playerUpdated', (playerInfo) => { 
     players[playerInfo.id] = playerInfo; 
     if (playerInfo.id === socket.id) { 
