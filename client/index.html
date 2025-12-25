@@ -153,6 +153,30 @@
             flex-direction: column;
             align-items: center;
         }
+        #lap-timer {
+            position: absolute;
+            top: 20px;
+            left: calc(50% + 140px);
+            background: rgba(0, 0, 0, 0.7);
+            border: 3px solid #fff;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: left;
+            width: 160px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        #current-lap {
+            color: #55ff55;
+        }
+        #best-lap {
+            color: #ffff55;
+            font-size: 0.8rem;
+            margin-top: 5px;
+        }
         #speed-value {
             font-size: 2rem;
             font-weight: bold;
@@ -318,6 +342,10 @@
         <div id="speedometer">
             <div id="speed-value">0</div>
             <div id="speed-unit">KM/H</div>
+        </div>
+        <div id="lap-timer">
+            <div id="current-lap">LAP: 00:00.00</div>
+            <div id="best-lap">BEST: --:--.--</div>
         </div>
         <div id="zoom-controls">
             <button id="zoomOut" class="zoom-btn">-</button>

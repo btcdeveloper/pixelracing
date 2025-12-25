@@ -21,6 +21,8 @@ const carOptions = document.querySelectorAll('.car-option');
 const toggleMusicBtn = document.getElementById('toggleMusic');
 const toggleEngineBtn = document.getElementById('toggleEngine');
 const speedValueEl = document.getElementById('speed-value');
+const currentLapEl = document.getElementById('current-lap');
+const bestLapEl = document.getElementById('best-lap');
 const lapCountSelect = document.getElementById('lapCount');
 const trackSelect = document.getElementById('trackSelect');
 
@@ -173,8 +175,17 @@ let localPlayer = {
     id: null, x: 1500, y: 1000, angle: 0, speed: 0,
     nickname: '', color: '#ff0000', laps: 0,
     lastPassedFinish: false, ready: false, checkpointHit: false,
-    steering: 0
+    steering: 0, currentLapTime: 0, bestLapTime: Infinity
 };
+
+function formatTime(ms) {
+    if (ms === Infinity) return "--:--.--";
+    const totalSeconds = ms / 1000;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    const hundredths = Math.floor((ms % 1000) / 10);
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${hundredths.toString().padStart(2, '0')}`;
+}
 
 const trackPresets = {
     preset1: { 
@@ -323,6 +334,7 @@ socket.on('playerUpdated', (playerInfo) => {
             localPlayer.x = playerInfo.x; localPlayer.y = playerInfo.y; localPlayer.angle = playerInfo.angle; 
         }
         localPlayer.laps = playerInfo.laps; localPlayer.ready = true; localPlayer.color = playerInfo.color; 
+        if (playerInfo.bestLapTime !== undefined) localPlayer.bestLapTime = playerInfo.bestLapTime;
     } 
     updateColorUI(); 
 });
@@ -350,6 +362,9 @@ socket.on('gameStateUpdate', (state, winners) => {
     if (gameStarted && musicEnabled) playMusic(); 
     if (state === 'LOBBY') { 
         localPlayer.laps = 0; localPlayer.speed = 0; fireworks = []; wheelParticles = [];
+        localPlayer.currentLapTime = 0; localPlayer.bestLapTime = Infinity;
+        if (currentLapEl) currentLapEl.textContent = `LAP: 00:00.00`;
+        if (bestLapEl) bestLapEl.textContent = `BEST: --:--.--`;
         const rBtn = document.getElementById('resetBtn'); if (rBtn) rBtn.remove(); 
     } 
 });
@@ -464,11 +479,24 @@ function update() {
     const distToCheckpoint = Math.sqrt(Math.pow(localPlayer.x - checkpoint.x, 2) + Math.pow(localPlayer.y - checkpoint.y, 2));
     if (distToCheckpoint < 1500) localPlayer.checkpointHit = true;
 
+    // Таймер круга
+    if (gameState === 'RACING') {
+        localPlayer.currentLapTime += 1000/60; // Примерно 16.6ms на кадр (60fps)
+        if (currentLapEl) currentLapEl.textContent = `LAP: ${formatTime(localPlayer.currentLapTime)}`;
+    }
+
     const fx = trackPoints[0].x;
     const fy = trackPoints[0].y;
     const onFinishLine = Math.abs(localPlayer.x - fx) < 100 && Math.abs(localPlayer.y - fy) < roadWidth/2;
     if (onFinishLine && !localPlayer.lastPassedFinish && totalSpeed > 0 && localPlayer.checkpointHit) {
-        socket.emit('lapCompleted');
+        // Обработка времени круга
+        if (localPlayer.currentLapTime < localPlayer.bestLapTime) {
+            localPlayer.bestLapTime = localPlayer.currentLapTime;
+            if (bestLapEl) bestLapEl.textContent = `BEST: ${formatTime(localPlayer.bestLapTime)}`;
+        }
+        localPlayer.currentLapTime = 0;
+        
+        socket.emit('lapCompleted', { bestLapTime: localPlayer.bestLapTime });
         localPlayer.lastPassedFinish = true; localPlayer.checkpointHit = false;
     } else if (!onFinishLine) {
         localPlayer.lastPassedFinish = false;
@@ -835,13 +863,15 @@ function drawLeaderboard() {
         if (a.finished && !b.finished) return -1;
         if (!a.finished && b.finished) return 1;
         if (b.laps !== a.laps) return b.laps - a.laps;
+        // Если круги одинаковые, сортируем по лучшему времени (если оно есть)
+        if (a.bestLapTime !== b.bestLapTime) return a.bestLapTime - b.bestLapTime;
         return 0;
     });
 
     const x = 20;
     const y = 100;
     const itemHeight = 35;
-    const width = 220;
+    const width = 280; // Увеличили ширину для времени
     const height = playerArray.length * itemHeight + 50;
 
     // Фон таблицы
@@ -856,6 +886,9 @@ function drawLeaderboard() {
     ctx.font = 'bold 16px Courier New';
     ctx.textAlign = 'left';
     ctx.fillText('STANDINGS', x + 10, y + 25);
+    ctx.textAlign = 'right';
+    ctx.fillText('BEST', x + width - 10, y + 25);
+    ctx.textAlign = 'left';
     
     // Линия под заголовком
     ctx.beginPath();
@@ -889,10 +922,10 @@ function drawLeaderboard() {
         const displayName = nickname.length > 10 ? nickname.substring(0, 10) + '..' : nickname;
         ctx.fillText(displayName, x + 50, py);
 
-        // Круги
+        // Лучшее время
         ctx.textAlign = 'right';
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';
-        ctx.fillText(`L${p.laps}/${targetLaps}`, x + width - 10, py);
+        ctx.fillStyle = '#ffff55';
+        ctx.fillText(formatTime(p.bestLapTime), x + width - 10, py);
         ctx.textAlign = 'left';
     });
 }
