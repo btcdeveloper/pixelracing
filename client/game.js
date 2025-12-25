@@ -417,6 +417,28 @@ function loop() {
                 localPlayer.currentLapTime += 16;
                 const cl = document.getElementById('current-lap'); if (cl) cl.textContent = `LAP: ${formatTime(localPlayer.currentLapTime)}`;
 
+                // Логика кругов
+                const pStart = trackPoints[0];
+                const distToStart = Math.sqrt(Math.pow(localPlayer.x - pStart.x, 2) + Math.pow(localPlayer.y - pStart.y, 2));
+                
+                if (distToStart < 600) {
+                    if (!localPlayer.lastPassedFinish) {
+                        if (localPlayer.laps > 0) {
+                            if (localPlayer.currentLapTime < localPlayer.bestLapTime) {
+                                localPlayer.bestLapTime = localPlayer.currentLapTime;
+                                const bl = document.getElementById('best-lap'); if (bl) bl.textContent = `BEST: ${formatTime(localPlayer.bestLapTime)}`;
+                            }
+                            socket.emit('lapCompleted', { bestLapTime: localPlayer.bestLapTime });
+                        }
+                        localPlayer.laps++;
+                        localPlayer.currentLapTime = 0;
+                        localPlayer.lastPassedFinish = true;
+                        const lv = document.getElementById('lap-value'); if (lv) lv.textContent = `LAP ${localPlayer.laps}/${targetLaps}`;
+                    }
+                } else {
+                    localPlayer.lastPassedFinish = false;
+                }
+
                 // Звук двигателя
                 if (engineEnabled && engineGain) {
                     const basePitch = 40 + Math.abs(ts) * 8;
@@ -495,16 +517,21 @@ function drawMinimap() {
     ctx.stroke();
 
     Object.values(players).forEach(p => {
+        if (p.id === socket.id) return; // Себя нарисуем в конце
         ctx.fillStyle = p.color;
         ctx.beginPath();
-        ctx.arc(tmx(p.x), tmy(p.y), p.id === socket.id ? 6 : 4, 0, Math.PI * 2);
+        ctx.arc(tmx(p.x), tmy(p.y), 4, 0, Math.PI * 2);
         ctx.fill();
-        if (p.id === socket.id) {
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        }
     });
+
+    // Себя рисуем поверх всех
+    ctx.fillStyle = localPlayer.color;
+    ctx.beginPath();
+    ctx.arc(tmx(localPlayer.x), tmy(localPlayer.y), 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 }
 
 // --- 5. ИНИЦИАЛИЗАЦИЯ ---
@@ -569,12 +596,22 @@ window.onload = () => {
     
     // Загрузка сохраненного никнейма
     const savedNickname = localStorage.getItem('pixelRacing_nickname');
+    const nick1 = document.getElementById('nickname');
+    const nick2 = document.getElementById('nickname-join');
+    
     if (savedNickname) {
-        const nick1 = document.getElementById('nickname');
-        const nick2 = document.getElementById('nickname-join');
         if (nick1) nick1.value = savedNickname;
         if (nick2) nick2.value = savedNickname;
     }
+
+    // Сохранение при вводе
+    const saveNick = (e) => {
+        localStorage.setItem('pixelRacing_nickname', e.target.value);
+        if (nick1) nick1.value = e.target.value;
+        if (nick2) nick2.value = e.target.value;
+    };
+    if (nick1) nick1.oninput = saveNick;
+    if (nick2) nick2.oninput = saveNick;
     
     // --- АУДИО ЛОГИКА ---
     // ... existing audio logic ...
@@ -857,11 +894,14 @@ socket.on('gameStateUpdate', (s, winners) => {
     }
 });
 socket.on('roomJoined', (d) => { 
-    trackPoints = d.trackData.points; 
+    trackPoints = d.trackData.points || d.trackData; 
     localPlayer.isHost = d.isHost; 
+    targetLaps = d.targetLaps || 5; 
     generateScenery(); 
     gameStarted = true;
     localPlayer.ready = true; // Машина должна быть видна сразу
+    localPlayer.laps = 0;
+    const lv = document.getElementById('lap-value'); if (lv) lv.textContent = `LAP 0/${targetLaps}`;
     document.getElementById('ui').style.display = 'none';
     document.getElementById('lobby-ui').style.display = 'block';
     updateLobbyUI();
