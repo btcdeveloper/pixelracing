@@ -3,6 +3,8 @@ const ctx = canvas.getContext('2d');
 
 console.log("Pixel Racing Engine v1.2 Initializing...");
 
+const socket = io();
+
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -71,6 +73,13 @@ function createRoom() {
 
     localPlayer.nickname = nick;
     ui.style.display = 'none';
+    
+    // Показываем игровой интерфейс
+    document.getElementById('speedometer').style.display = 'flex';
+    document.getElementById('lap-counter').style.display = 'flex';
+    document.getElementById('lap-timer').style.display = 'flex';
+    document.getElementById('zoom-controls').style.display = 'flex';
+    
     gameStarted = true;
 
     socket.emit('createRoom', {
@@ -94,6 +103,13 @@ function joinRoom(roomId) {
 
     localPlayer.nickname = nick;
     ui.style.display = 'none';
+    
+    // Показываем игровой интерфейс
+    document.getElementById('speedometer').style.display = 'flex';
+    document.getElementById('lap-counter').style.display = 'flex';
+    document.getElementById('lap-timer').style.display = 'flex';
+    document.getElementById('zoom-controls').style.display = 'flex';
+    
     gameStarted = true;
 
     socket.emit('joinRoom', {
@@ -304,7 +320,6 @@ document.getElementById('zoomOut').addEventListener('click', () => {
     targetZoom = Math.max(minZoom, targetZoom / 1.5);
 });
 
-const socket = io();
 let myId = null, players = {}, gameState = 'LOBBY', gameStarted = false, winnersList = [], fireworks = [], targetLaps = 5;
 
 // ЭФФЕКТЫ И ГЕЙМПЛЕЙ
@@ -640,6 +655,13 @@ socket.on('gameStateUpdate', (state, winners) => {
         gameStarted = false;
         ui.style.display = 'block';
         if (pauseMenu) pauseMenu.style.display = 'none';
+        
+        // Скрываем игровой интерфейс
+        document.getElementById('speedometer').style.display = 'none';
+        document.getElementById('lap-counter').style.display = 'none';
+        document.getElementById('lap-timer').style.display = 'none';
+        document.getElementById('zoom-controls').style.display = 'none';
+
         localPlayer.ready = false;
         localPlayer.laps = 0; localPlayer.speed = 0; fireworks = []; wheelParticles = [];
         localPlayer.currentLapTime = 0; localPlayer.bestLapTime = Infinity;

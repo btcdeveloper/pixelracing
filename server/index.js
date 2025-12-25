@@ -48,6 +48,10 @@ io.on('connection', (socket) => {
     // При подключении отправляем список комнат
     socket.emit('roomList', getRoomList());
 
+    socket.on('getRooms', () => {
+        socket.emit('roomList', getRoomList());
+    });
+
     socket.on('createRoom', (data) => {
         const roomId = socket.id; // ID комнаты совпадает с ID создателя
         rooms[roomId] = {
