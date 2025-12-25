@@ -174,13 +174,19 @@ io.on('connection', (socket) => {
 
     socket.on('startGame', () => {
         const result = findSocketPlayer(socket.id);
-        if (result && result.room.id === socket.id) { 
-            const room = result.room;
-            if (room.gameState === 'LOBBY') {
-                room.gameState = 'RACING';
-                room.winners = [];
-                io.to(room.id).emit('gameStateUpdate', room.gameState);
-                io.emit('roomList', getRoomList());
+        if (result) {
+            const { room, player } = result;
+            // Проверяем, является ли этот игрок создателем (хостом) комнаты
+            if (room.id === socket.id) { 
+                if (room.gameState === 'LOBBY') {
+                    room.gameState = 'RACING';
+                    room.winners = [];
+                    io.to(room.id).emit('gameStateUpdate', room.gameState);
+                    io.emit('roomList', getRoomList());
+                    console.log(`Race started in room ${room.id} by host ${player.nickname}`);
+                }
+            } else {
+                console.log(`Player ${player.nickname} tried to start race but is not host of room ${room.id}`);
             }
         }
     });

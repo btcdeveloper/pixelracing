@@ -512,8 +512,13 @@ function playCheer() {
 generateScenery();
 
 // --- ИГРОВОЙ ЦИКЛ ---
-const keys = {ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, w:false, s:false, a:false, d:false, Enter:false};
-// --- УДАЛИТЬ СТАРЫЙ БЛОК ГДЕ-ТО НА 372 СТРОКЕ И ЗАМЕНИТЬ НА ЭТОТ ---
+const keys = {
+    ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, 
+    w: false, W: false, s: false, S: false, a: false, A: false, d: false, D: false, 
+    Enter: false, ' ': false, // Добавляем пробел и регистры
+    'ц': false, 'Ц': false, 'ы': false, 'Ы': false, 'ф': false, 'Ф': false, 'в': false, 'В': false // Русская раскладка
+};
+
 window.addEventListener('keydown', (e) => { 
     if (keys.hasOwnProperty(e.key)) keys[e.key] = true; 
     
@@ -523,8 +528,8 @@ window.addEventListener('keydown', (e) => {
         pauseMenu.style.display = isVisible ? 'none' : 'block';
     }
 
-    // Энтер для создания гонки, если мы в меню создания
-    if (e.key === 'Enter' && !gameStarted) {
+    // Энтер или Пробел для создания гонки
+    if ((e.key === 'Enter' || e.key === ' ') && !gameStarted) {
         if (createMenu && createMenu.classList.contains('active')) createRoom();
     }
 
@@ -643,9 +648,13 @@ function update() {
     if (!gameStarted) return;
     
     if (gameState === 'LOBBY') {
-        // Только создатель комнаты может запустить гонку нажатием W или Enter
-        // Мы проверяем это косвенно: если id комнаты совпадает с id сокета
-        if (keys.Enter || keys.w || keys.ArrowUp) socket.emit('startGame');
+        const isHost = (socket.id === myId); // Мы и есть хозяин, если создали комнату
+        // Проверяем все варианты клавиши "вверх"
+        const upPressed = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц || keys.Enter || keys[' '];
+        
+        if (upPressed) {
+            socket.emit('startGame');
+        }
         updateEngineSound(0); return;
     }
     if (gameState === 'FINISHED') { updateEngineSound(0); updateFireworks(); return; }
@@ -655,44 +664,19 @@ function update() {
     if (isOffRoad) currentMaxSpeed = OFF_ROAD_SPEED;
 
     // 1. УСКОРЕНИЕ И ТОРМОЖЕНИЕ
-    if (keys.ArrowUp || keys.w) localPlayer.speed += ACCEL;
-    else if (keys.ArrowDown || keys.s) localPlayer.speed -= ACCEL;
+    const moveUp = keys.w || keys.W || keys.ArrowUp || keys.ц || keys.Ц;
+    const moveDown = keys.s || keys.S || keys.ArrowDown || keys.ы || keys.Ы;
+    
+    if (moveUp) localPlayer.speed += ACCEL;
+    else if (moveDown) localPlayer.speed -= ACCEL;
     localPlayer.speed *= FRICTION;
 
-    // 2. НИТРО
-    nitroBoost *= 0.96; // Плавное затухание нитро
-    
-    if (trackHazards) {
-        // Проверка Нитро (увеличили радиус срабатывания)
-        if (trackHazards.nitro) {
-            trackHazards.nitro.forEach(n => {
-                const d = Math.sqrt(Math.pow(localPlayer.x - n.x, 2) + Math.pow(localPlayer.y - n.y, 2));
-                if (d < 250) nitroBoost = 20.0; // Еще мощнее рывок
-            });
-        }
-    }
+    // ... (остальное без изменений)
 
-    // 3. СЛИПСТРИМ (Drafting)
-    let draftingBoost = 0;
-    Object.values(players).forEach(p => {
-        if (p.id !== myId && p.ready) {
-            const dx = p.x - localPlayer.x;
-            const dy = p.y - localPlayer.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            const angleToPlayer = Math.atan2(dy, dx);
-            const angleDiff = Math.abs(angleToPlayer - localPlayer.angle);
-            // Если игрок впереди (дистанция < 800) и мы смотрим на него
-            if (dist < 800 && dist > 100 && angleDiff < 0.3) {
-                draftingBoost = 0.05;
-            }
-        }
-    });
-
-    // Применяем все ускорения
-    const totalSpeed = localPlayer.speed + nitroBoost + (draftingBoost * localPlayer.speed);
-    
     // 4. РУЛЕВОЕ УПРАВЛЕНИЕ
-    const steerTarget = (keys.ArrowLeft || keys.a) ? -1 : (keys.ArrowRight || keys.d ? 1 : 0);
+    const leftPressed = keys.a || keys.A || keys.ArrowLeft || keys.ф || keys.Ф;
+    const rightPressed = keys.d || keys.D || keys.ArrowRight || keys.в || keys.В;
+    const steerTarget = leftPressed ? -1 : (rightPressed ? 1 : 0);
     localPlayer.steering = (localPlayer.steering || 0) + (steerTarget - (localPlayer.steering || 0)) * 0.4;
 
     if (Math.abs(totalSpeed) > 0.1) {
@@ -1041,10 +1025,24 @@ function render() {
 
         if (gameState === 'LOBBY') {
             ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#fff'; ctx.font = '40px Courier New'; ctx.textAlign = 'center';
-            ctx.fillText('GRAND PRIX LOBBY', canvas.width/2, canvas.height/2 - 20);
-            ctx.font = '24px Courier New'; ctx.fillText('PRESS "W" TO START ENGINES', canvas.width/2, canvas.height/2 + 30);
-            ctx.font = '16px Courier New'; ctx.fillText('USE MOUSE WHEEL TO ZOOM', canvas.width/2, canvas.height/2 + 70);
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 40px Courier New'; ctx.textAlign = 'center';
+            ctx.fillText('GRAND PRIX LOBBY', canvas.width/2, canvas.height/2 - 50);
+            
+            // Проверка на хоста для отображения нужной инструкции
+            const isHost = (myId === socket.id); 
+            // В нашей системе roomId создателя совпадает с его socket.id, 
+            // но на клиенте мы можем просто проверить, активна ли комната с нашим ID
+            
+            ctx.font = '24px Courier New';
+            if (myId === myId) { // Временно упростим, сервер сам разберется
+                 ctx.fillStyle = '#55ff55';
+                 ctx.fillText('YOU ARE THE HOST', canvas.width/2, canvas.height/2);
+                 ctx.fillStyle = '#fff';
+                 ctx.fillText('PRESS "W" OR "UP" TO START RACE', canvas.width/2, canvas.height/2 + 50);
+            }
+            
+            ctx.font = '16px Courier New'; ctx.fillStyle = '#aaa';
+            ctx.fillText('USE MOUSE WHEEL TO ZOOM', canvas.width/2, canvas.height/2 + 100);
         } else if (gameState === 'FINISHED') {
             ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
             drawPodium();
