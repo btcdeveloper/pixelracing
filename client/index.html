@@ -8,25 +8,26 @@
         body {
             margin: 0;
             padding: 0;
-            background: #1a1a1a;
+            background: #000;
             color: #fff;
             font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            width: 100vw;
             height: 100vh;
             overflow: hidden;
         }
         #game-container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background: #1a5e1a;
             overflow: hidden;
         }
         canvas {
             display: block;
+            width: 100%;
+            height: 100%;
             image-rendering: pixelated;
         }
         #audio-controls {
@@ -277,7 +278,7 @@
 </head>
 <body>
     <div id="game-container">
-        <canvas id="gameCanvas" width="1200" height="800"></canvas>
+        <canvas id="gameCanvas"></canvas>
             <div id="audio-controls">
                 <div class="audio-group">
                     <button id="toggleMusic" class="audio-btn">Music: ON ▾</button>

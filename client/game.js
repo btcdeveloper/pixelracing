@@ -4,9 +4,13 @@ const ctx = canvas.getContext('2d');
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    // Сбрасываем центрирование UI если нужно
 }
 window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+resizeCanvas(); // Вызываем сразу
+
+// Убедимся, что рендер начнется с правильными размерами
+setTimeout(resizeCanvas, 100);
 
 const ui = document.getElementById('ui');
 const nicknameInput = document.getElementById('nickname');
